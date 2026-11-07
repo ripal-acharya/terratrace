@@ -122,3 +122,51 @@ class TestAppData(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSecurity(unittest.TestCase):
+    def test_password_hashing(self):
+        import server
+        rec = server.hash_password("correct horse battery")
+        self.assertTrue(server.verify_password("correct horse battery", rec))
+        self.assertFalse(server.verify_password("wrong", rec))
+        self.assertNotIn("correct horse", json.dumps(rec))
+        self.assertGreaterEqual(rec["iter"], 200000)
+
+    def test_audit_chain_detects_tampering(self):
+        import server
+        entries, prev = [], "0" * 64
+        import hashlib
+        for i in range(3):
+            e = {"record_key": f"action:A{i}", "new_value": "approved", "prev_hash": prev}
+            e["hash"] = hashlib.sha256(json.dumps(e, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+            prev = e["hash"]
+            entries.append(e)
+        self.assertTrue(server.chain_ok(entries))
+        entries[1]["new_value"] = "rejected"
+        self.assertFalse(server.chain_ok(entries))
+
+    def test_roles_need_to_know(self):
+        import server
+        self.assertFalse(server.can(["viewer"], "review"))
+        self.assertFalse(server.can(["admin"], "see_farm"))
+        self.assertTrue(server.can(["farm_advisor"], "see_farm"))
+        self.assertTrue(server.can(["reviewer"], "review"))
+        self.assertTrue(server.is_farm_key("corr:farm_survey:FS00012"))
+        self.assertFalse(server.is_farm_key("action:A1"))
+
+    def test_data_not_served_as_static_files(self):
+        src = (ROOT / "server.py").read_text(encoding="utf-8")
+        self.assertIn('path.startswith("/data/")', src)
+        self.assertIn("HttpOnly; SameSite=Strict", src)
+        self.assertIn('HOST = "127.0.0.1"', src)
+
+    def test_review_keys_and_final_decisions(self):
+        import server
+        keys = server.known_review_keys()
+        self.assertIn("action:A1", keys)
+        self.assertNotIn("action:FAKE", keys)
+        src = (ROOT / "server.py").read_text(encoding="utf-8")
+        self.assertIn("_review_lock", src)          # check + write is one step
+        self.assertIn("self._json(409", src)        # a second decision is refused
+        self.assertIn('"Unknown result."', src)     # made-up keys are refused

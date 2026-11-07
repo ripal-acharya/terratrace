@@ -2,30 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5fae34">
+  <meta name="description" content="TerraTrace – climate and nature risks for Apetit's value chain, with traceable evidence and expert review.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="TerraTrace">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>TerraTrace – Climate &amp; Nature Navigator for Apetit</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="styles.css">
   <script type="module" src="app.js"></script>
 </head>
 <body>
-  <header class="top">
-    <div class="brand">
-      <span class="logo" aria-hidden="true">🌱</span>
-      <div>
-        <div class="title">TerraTrace</div>
-        <div class="subtitle">Climate &amp; Nature Navigator for Apetit · by Team FarmSense</div>
-      </div>
-    </div>
-    <div class="reviewer">
-      <label for="reviewer">Reviewer</label>
-      <input id="reviewer" type="text" maxlength="60" placeholder="Your name (needed to approve)" autocomplete="name">
-    </div>
-  </header>
-  <nav class="tabs" id="tabs" aria-label="Main"></nav>
-  <div class="banner" id="banner">Synthetic data – not Apetit's real emissions or real farms. Every number is a draft until an expert approves it.</div>
-  <main id="main" tabindex="-1"><p class="muted">Loading…</p></main>
-  <dialog id="dlg"><div id="dlg-body"></div><form method="dialog"><button class="btn">Close</button></form></dialog>
+  <div id="root"><p class="empty">Loading…</p></div>
+  <dialog id="dlg"><div id="dlg-body"></div></dialog>
   <noscript>Please enable JavaScript to use TerraTrace.</noscript>
 </body>
 </html>

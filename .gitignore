@@ -5,3 +5,5 @@ __pycache__/
 node_modules/
 /data/
 .venv/
+instance/
+_to_delete/
