@@ -17,6 +17,7 @@ person approves it.
 | **Climate Risk** | C1, C2, C3 | Yield forecast 2027–2031, yield change and bad-year probability 2041–2060 under SSP1-2.6 / 2-4.5 / 5-8.5, € risk and value of irrigation, back-test |
 | **Nature Map** | D1 (SBTN) | Phosphorus and nitrogen from contract parcels to water in 2025, catchment priority map and ranking |
 | **Transport CO₂** | A (cat 4 and 9) | tCO₂e by mode and year, automatic detection and correction of missing sea legs |
+| **Pathways & targets** | B1, B2, D2 | SBTi targets with a FLAG split, pathway under two NGFS scenarios with the gap per year, base-year options, abatement cost curve (MACC) of all 30 levers, value-chain nature screening of 2025 purchases |
 | **AI Copilot** | E | Questions in plain English; answers name their evidence (file and row) |
 | **Review & Audit Log** | traceability | Approve / reject every result and every data correction; append-only audit log; export of approved results only |
 
@@ -116,7 +117,7 @@ Measurement improvements are not reductions: lever L27 is shown as "not a reduct
 * **Copilot.** Login required; 1,000 characters; 10 questions per minute per user; 8 KB request limit; the API
   key stays in `.env` on the server; only a short summary of results is sent, never farm-level rows.
 * **CSV export** (reviewers and admins) contains approved results only and escapes spreadsheet formulas.
-* The server binds to `127.0.0.1` only. Tests: `python3 -m unittest discover -s tests -v` (19 tests).
+* The server binds to `127.0.0.1` only. Tests: `python3 -m unittest discover -s tests -v` (27 tests).
 
 ## Using real Apetit data (privacy by design)
 
@@ -154,14 +155,28 @@ same code runs, but these rules apply:
 * Synthetic data; one weather realisation per SSP; no CO₂ fertilisation and no new varieties.
 * Earlier sowing and tolerant varieties are not modelled; irrigation is.
 * The nature model is a simple export-coefficient model calibrated on six catchments.
-* Not covered yet: full GHG inventory (A2) and SBTi pathways (B). These are the next steps.
+* Not covered yet: our own full 2025 GHG inventory (A2) and the E answers file. The pathway starts from the 2024 inventory in the package until A2 is done.
+
+## Open-source components and licences
+
+| Component | Used for | Licence |
+|---|---|---|
+| Python standard library | web server, Copilot API, audit log | PSF License |
+| pandas | data pipeline | BSD 3-Clause |
+| NumPy | models and calculations | BSD 3-Clause |
+| cryptography | Ed25519 signatures (signing.py) | Apache 2.0 or BSD 3-Clause |
+| Google Gemini API | Copilot answers (external service, optional) | Google API terms |
+
+No JavaScript libraries, fonts or other third-party code are bundled: the web app is plain HTML, CSS and JavaScript.
+The Apetit × Since AI data package is CC BY 4.0 (© Since AI ry 2026) and is **not** included in this repository;
+Apetit's own sample workbook is not used. TerraTrace code: MIT licence.
 
 ## Project structure
 
 ```
 run_all.py          one command: data -> results
 server.py           web server + Copilot API (standard library only)
-pipeline/           climate_risk.py, nature.py, transport.py, actions.py, audit.py, config.py
+pipeline/           climate_risk.py, nature.py, transport.py, actions.py, pathways.py, audit.py, config.py
 app/                index.html, app.js, styles.css, data/*.json
 submissions/        CSVs for the auto-scored tasks
 tests/              unit tests

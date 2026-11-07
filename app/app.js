@@ -292,7 +292,8 @@ function lineChart(series, opt) {
   const Y = (v) => T + (1 - v / y1) * (H - T - B);
   const g = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart', role: 'img', 'aria-label': opt.label || 'chart' });
   for (const v of ticks) g.append(s('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: 'grid-line' }), s('text', { x: L - 8, y: Y(v) + 4, 'text-anchor': 'end' }, tickTxt(v)));
-  for (let v = Math.ceil(x0 / 10) * 10; v <= x1; v += 10) g.append(s('text', { x: X(v), y: H - 6, 'text-anchor': 'middle' }, v));
+  const xs_ = opt.xstep || 10;
+  for (let v = Math.ceil(x0 / xs_) * xs_; v <= x1; v += xs_) g.append(s('text', { x: X(v), y: H - 6, 'text-anchor': 'middle' }, v));
   const clean = series.map((se) => ({ ...se, p: se.points.filter((q) => isNum(q[0]) && isNum(q[1])).sort((a, b) => a[0] - b[0]) }));
   const smooth = (pp) => {
     const P = pp.map((q) => [X(q[0]), Y(q[1])]);
@@ -520,28 +521,165 @@ function pageClimate() {
 
 function pageNature() {
   const { nature } = S.data;
-  const byId = Object.fromEntries(nature.catchments.map((c) => [c.catchment_id, c]));
+  const cats = nature.catchments;
+  const byId = Object.fromEntries(cats.map((c) => [c.catchment_id, c]));
   const sel = S.ui.nature;
-  const feats = nature.geojson.features.filter((f) => f.geometry && f.geometry.type === 'Polygon');
-  const color = (c) => (!c || c.p_kg <= 0 ? '#e6eadf' : c.rank <= 5 ? '#b8520a' : c.rank <= 12 ? '#e07a1f' : c.rank <= 25 ? '#f3ad62' : '#fbe3c6');
-  const panel = (region) => {
-    const fs = feats.filter((f) => f.properties.region === region);
-    if (!fs.length) return null;
-    let minX = 180, maxX = -180, minY = 90, maxY = -90;
-    for (const f of fs) for (const [x, y] of f.geometry.coordinates[0]) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
-    const k = Math.cos((((minY + maxY) / 2) * Math.PI) / 180);
-    const W = 400, sc = W / ((maxX - minX) * k), H = Math.round((maxY - minY) * sc);
-    const svg = s('svg', { viewBox: `-2 -2 ${W + 4} ${H + 4}`, class: 'chart map', role: 'img', 'aria-label': 'Catchment priority map ' + REG[region] });
-    for (const f of fs) {
-      const id = f.properties.catchment_id, c = byId[id];
-      const d = f.geometry.coordinates[0].map((p, i) => (i ? 'L' : 'M') + ((p[0] - minX) * k * sc).toFixed(1) + ',' + ((maxY - p[1]) * sc).toFixed(1)).join('') + 'Z';
-      const path = s('path', { d, fill: color(c), class: sel.id === id ? 'sel' : null }, s('title', {}, c ? `${id}: rank ${c.rank}, P ${num(c.p_kg)} kg, N ${num(c.n_kg)} kg, ${c.status}` : id));
-      path.addEventListener('click', () => { sel.id = id; render(); });
-      svg.append(path);
+  const cur = byId[sel.id] || cats[0];
+  if (!sel.region) sel.region = cur.region;
+  const choose = (c) => { sel.id = c.catchment_id; sel.region = c.region; render(); };
+  const has = (c) => !!c && c.p_kg > 0;
+  const tier = (c) => (!has(c) ? 0 : c.rank <= 5 ? 1 : c.rank <= 12 ? 2 : c.rank <= 25 ? 3 : 4);
+  const sum = (arr, f) => arr.reduce((a, r) => a + (r[f] || 0), 0);
+  const STATUS = { bad: 'sbad', poor: 'spoor', moderate: 'smod', good: 'sgood' };
+  const stChip = (st) => h('span', { class: 'delta ' + (st === 'bad' || st === 'poor' ? 'bad' : st === 'moderate' ? 'flat' : 'good'), text: st });
+  const totP = sum(cats, 'p_kg'), totN = sum(cats, 'n_kg');
+  const top = cats.filter(has).slice().sort((a, b) => a.rank - b.rank);
+  const top5P = sum(top.slice(0, 5), 'p_kg');
+
+  // ---- overview: hero number + KPI grid + pill columns (top 12 catchments)
+  const kpi = (label, value, note) => h('div', { class: 'kp' }, h('span', { text: label }), h('strong', { text: value }), note ? h('small', { text: note }) : null);
+  const left = h('div', { class: 'ov-left' },
+    h('div', { class: 'ov-lbl', text: 'Phosphorus reaching water · 2025' }),
+    h('div', { class: 'ov-hero' }, h('strong', { text: num(totP) }), h('span', { text: 'kg P' })),
+    h('div', { class: 'kp-grid' },
+      kpi('Nitrogen to water', num(totN) + ' kg'),
+      kpi('Apetit contract area', num(sum(cats, 'contract_area_ha')) + ' ha'),
+      kpi('Catchments', String(cats.length), `${top.length} with Apetit parcels`),
+      kpi('Poor or bad status', String(cats.filter((c) => c.status === 'poor' || c.status === 'bad').length), 'ecological status'),
+      kpi('Top 5 share of P', num((top5P / totP) * 100) + ' %', 'act first here'),
+      kpi('Model check (dev)', num(nature.calibration.dev_score.score, 1), `baseline ${num(nature.calibration.baseline_dev_score, 1)}`)));
+
+  const cols = top.slice(0, 12);
+  const narrow = window.innerWidth < 640;
+  const W = narrow ? 380 : 640, H = 280, L = 34, R = 8, T = 30, B = 30;
+  const ticks = niceTicks(Math.max(...cols.map((c) => c.priority_score)), 4), y1 = ticks[ticks.length - 1];
+  const band = (W - L - R) / cols.length, PW = narrow ? 11 : 16;
+  const X = (i) => L + (i + 0.5) * band, Y = (v) => T + (1 - v / y1) * (H - T - B);
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart pills', role: 'img', 'aria-label': 'Priority score of the top 12 catchments' });
+  const gMain = grad(svg, 'gr-brand', true), gTop = grad(svg, 'gr-earth', true);
+  for (const v of ticks) svg.append(s('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: 'grid-line' }), s('text', { x: L - 8, y: Y(v) + 4, 'text-anchor': 'end' }, tickTxt(v)));
+  const tip = vizTip();
+  const wrap = h('div', { class: 'viz' }, svg, tip);
+  cols.forEach((c, i) => {
+    const on = c.catchment_id === cur.catchment_id;
+    const g = s('g', { class: 'pcol' + (on ? ' on' : ''), tabindex: '0', role: 'button', 'aria-pressed': String(on), 'aria-label': `${c.catchment_id}: rank ${c.rank}, score ${num(c.priority_score, 2)}` });
+    g.append(s('rect', { x: X(i) - band / 2, y: T - 20, width: band, height: H - T - B + 20, class: 'hit' }),
+      s('rect', { x: X(i) - PW / 2, y: Y(c.priority_score), width: PW, height: Y(0) - Y(c.priority_score), rx: PW / 2, fill: c.rank <= 5 ? gTop : gMain, class: on ? 'pbar on' : 'pbar' }));
+    if (on) g.append(s('text', { x: X(i), y: Y(c.priority_score) - 9, 'text-anchor': 'middle', class: 'pv' }, num(c.priority_score, 1)));
+    g.append(s('text', { x: X(i), y: H - 8, 'text-anchor': 'middle', class: on ? 'px on' : 'px' }, narrow ? c.catchment_id.slice(1) : c.catchment_id));
+    const show = () => {
+      fillTip(tip, `${c.catchment_id} · rank ${c.rank}`, [{ key: 'kearth', value: num(c.priority_score, 2), name: 'priority score' },
+        { key: 'kbrand', value: num(c.p_kg) + ' kg', name: 'P to water' }, { key: 'kghost', value: REG[c.region], name: '' }]);
+      placeTip(wrap, tip, (X(i) / W) * svg.getBoundingClientRect().width);
+    };
+    g.addEventListener('pointerenter', show); g.addEventListener('focus', show);
+    g.addEventListener('click', () => choose(c));
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(c); } });
+    svg.append(g);
+  });
+  svg.addEventListener('pointerleave', () => tip.classList.remove('on'));
+  const legend = h('div', { class: 'legend' }, h('span', {}, h('span', { class: 'sw kearth' }), 'Top 5 (act first)'), h('span', {}, h('span', { class: 'sw kbrand' }), 'Rank 6–12'),
+    h('span', { text: 'Tap a column to select' }));
+  const overview = card('Nature overview', 'SBTN step 2: nutrient pressure × state of nature, per catchment', h('div', { class: 'card-b' },
+    h('div', { class: 'ov' }, left, h('div', { class: 'ov-chart' }, h('div', { class: 'ov-lbl', text: 'Priority score, top 12 catchments' }), wrap, legend))));
+
+  // ---- map: one region at a time, gradient-filled catchments, rank badges
+  const feats = nature.geojson.features.filter((f) => f.geometry && f.geometry.type === 'Polygon' && f.properties.region === sel.region);
+  let minX = 180, maxX = -180, minY = 90, maxY = -90;
+  for (const f of feats) for (const [x, y] of f.geometry.coordinates[0]) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  const k = Math.cos((((minY + maxY) / 2) * Math.PI) / 180);
+  const MW = 400, sc = MW / ((maxX - minX) * k), MH = Math.round((maxY - minY) * sc);
+  const msvg = s('svg', { viewBox: `-6 -6 ${MW + 12} ${MH + 12}`, class: 'chart map', role: 'group', 'aria-label': 'Catchment priority map ' + REG[sel.region] });
+  const hatch = 'tt-hatch-' + (++_gid);
+  msvg.append(s('defs', {}, s('pattern', { id: hatch, width: 7, height: 7, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' },
+    s('rect', { width: 7, height: 7, class: 'hatch-bg' }), s('line', { x1: 0, y1: 0, x2: 0, y2: 7, class: 'hatch-ln' }))));
+  const fills = [`url(#${hatch})`, grad(msvg, 'gr-m1', true), grad(msvg, 'gr-m2', true), grad(msvg, 'gr-m3', true), grad(msvg, 'gr-m4', true)];
+  const gPin = grad(msvg, 'gr-pin', false);
+  const mwrap = h('div', { class: 'viz map-wrap' }), mtip = vizTip();
+  const shapes = s('g', {}), pins = s('g', {});
+  let selPath = null;
+  for (const f of feats) {
+    const id = f.properties.catchment_id, c = byId[id], t = tier(c), isSel = id === cur.catchment_id;
+    const P = f.geometry.coordinates[0].map((p) => [(p[0] - minX) * k * sc, (maxY - p[1]) * sc]);
+    const d = P.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ',' + q[1].toFixed(1)).join('') + 'Z';
+    const path = s('path', { d, fill: fills[t], class: 't' + t + (isSel ? ' sel' : ''), tabindex: has(c) ? '0' : null, role: has(c) ? 'button' : null,
+      'aria-label': has(c) ? `${id}, rank ${c.rank}, ${num(c.p_kg)} kg P, status ${c.status}` : `${id}, no Apetit parcels` });
+    const show = (xPx) => {
+      fillTip(mtip, has(c) ? `${id} · rank ${c.rank}` : id, has(c)
+        ? [{ key: 'kbrand', value: num(c.p_kg) + ' kg', name: 'P to water' }, { key: 'kghost', value: num(c.n_kg) + ' kg', name: 'N to water' }, { key: 'kearth', value: c.status, name: 'status' }]
+        : [{ key: 'kghost', value: '–', name: 'no Apetit parcels' }]);
+      placeTip(mwrap, mtip, xPx);
+    };
+    path.addEventListener('pointermove', (e) => show(e.clientX - mwrap.getBoundingClientRect().left));
+    path.addEventListener('pointerleave', () => mtip.classList.remove('on'));
+    if (has(c)) {
+      path.addEventListener('click', () => choose(c));
+      path.addEventListener('focus', () => show(mwrap.clientWidth / 2));
+      path.addEventListener('blur', () => mtip.classList.remove('on'));
+      path.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(c); } });
     }
-    return h('div', {}, h('div', { class: 'small muted', text: REG[region] }), svg);
-  };
-  const cur = byId[sel.id] || nature.catchments[0];
+    if (isSel) selPath = path; else shapes.append(path);
+    if (has(c) && (c.rank <= 5 || isSel)) {
+      let a = 0, cx = 0, cy = 0;
+      for (let i = 0; i < P.length - 1; i++) { const cr = P[i][0] * P[i + 1][1] - P[i + 1][0] * P[i][1]; a += cr; cx += (P[i][0] + P[i + 1][0]) * cr; cy += (P[i][1] + P[i + 1][1]) * cr; }
+      if (Math.abs(a) > 1e-6) { cx /= 3 * a; cy /= 3 * a; } else { cx = P[0][0]; cy = P[0][1]; }
+      pins.append(s('g', { class: 'pin' + (isSel ? ' on' : ''), transform: `translate(${cx.toFixed(1)},${cy.toFixed(1)})` },
+        s('rect', { x: -19, y: -19, width: 38, height: 38, rx: 12, fill: gPin }), s('text', { x: 0, y: 1 }, String(c.rank))));
+    }
+  }
+  if (selPath) shapes.append(selPath);
+  msvg.append(shapes, pins);
+  mwrap.append(msvg, mtip);
+  const regionTabs = h('div', { class: 'seg-ctl', role: 'radiogroup', 'aria-label': 'Region' },
+    ['FI_SW', 'SE_SKANE'].map((r) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(r === sel.region), class: r === sel.region ? 'on' : null,
+      text: r === 'FI_SW' ? 'Finland' : 'Sweden', onclick: () => { sel.region = r; render(); } })));
+  const mapCard = card('Priority map', REG[sel.region] + ' · hover for numbers, tap to select', h('div', { class: 'card-b' },
+    h('div', { class: 'map-tile' }, mwrap),
+    h('div', { class: 'legend' },
+      h('span', {}, h('span', { class: 'sw km1' }), 'Rank 1–5'), h('span', {}, h('span', { class: 'sw km2' }), '6–12'),
+      h('span', {}, h('span', { class: 'sw km3' }), '13–25'), h('span', {}, h('span', { class: 'sw km4' }), '26+'),
+      h('span', {}, h('span', { class: 'sw hatch' }), 'No Apetit parcels')),
+    h('p', { class: 'small muted', text: 'Synthetic catchment polygons placed in the real sourcing regions (not to scale).' })), regionTabs);
+
+  // ---- ranked list: where to act first
+  const rankCard = card('Where to act first', 'Highest pressure on waters in poor shape', h('div', { class: 'card-b' }, h('div', { class: 'rank' },
+    top.slice(0, 6).map((c) => {
+      const on = c.catchment_id === cur.catchment_id;
+      const row = h('div', { class: 'rk t' + tier(c) + (on ? ' on' : ''), tabindex: '0', role: 'button', 'aria-pressed': String(on),
+        'aria-label': `Rank ${c.rank}: ${c.catchment_id}, ${REG[c.region]}, ${num(c.p_kg)} kg P, status ${c.status}` },
+        h('span', { class: 'rk-n', text: '#' + c.rank }),
+        h('div', { class: 'rk-t' }, h('strong', { text: `${c.catchment_id} · ${c.region === 'FI_SW' ? 'Finland' : 'Sweden'}` }),
+          h('span', { text: `${c.water_type} · ${num(c.contract_area_ha)} ha · ${num(c.n_kg)} kg N` })),
+        h('div', { class: 'rk-v' }, h('span', { class: 'rk-pill', text: num(c.p_kg) + ' kg P' }), stChip(c.status)));
+      row.addEventListener('click', () => choose(c));
+      row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(c); } });
+      return row;
+    }))));
+
+  // ---- donut: where the phosphorus goes, by ecological status of the water
+  const groups = ['bad', 'poor', 'moderate', 'good'].map((st) => ({ st, p: sum(cats.filter((c) => c.status === st), 'p_kg'), n: cats.filter((c) => c.status === st).length }));
+  const D = 220, dcx = D / 2, dcy = D / 2, rr = 80, gap = 0.05;
+  const dsvg = s('svg', { viewBox: `0 0 ${D} ${D}`, class: 'chart donut', role: 'img', 'aria-label': 'Phosphorus by water status: ' + groups.map((x) => `${x.st} ${num((x.p / totP) * 100)} %`).join(', ') });
+  dsvg.append(s('circle', { cx: dcx, cy: dcy, r: rr, class: 'track' }));
+  const dtip = vizTip();
+  const dwrap = h('div', { class: 'viz donut-wrap' }, dsvg, dtip, h('div', { class: 'donut-c' }, h('strong', { text: num(totP) }), h('span', { text: 'kg P · 2025' })));
+  let a0 = -Math.PI / 2;
+  for (const x of groups) {
+    const frac = x.p / totP, a1 = a0 + frac * Math.PI * 2;
+    if (frac > 0.004) {
+      const seg = s('path', { d: arcPath(dcx, dcy, rr, a0 + gap / 2, Math.max(a0 + gap / 2 + 0.001, a1 - gap / 2)), class: 'dseg', stroke: grad(dsvg, 'gr-st ' + STATUS[x.st], false), tabindex: '0',
+        'aria-label': `${x.st}: ${num(x.p)} kg P, ${num(frac * 100)} %` });
+      const on = () => { fillTip(dtip, `Status: ${x.st}`, [{ key: STATUS[x.st], value: num(x.p) + ' kg P', name: `${num(frac * 100)} % · ${x.n} catchments` }]); placeTip(dwrap, dtip, dwrap.clientWidth / 2 - 90); };
+      seg.addEventListener('pointerenter', on); seg.addEventListener('focus', on);
+      seg.addEventListener('pointerleave', () => dtip.classList.remove('on')); seg.addEventListener('blur', () => dtip.classList.remove('on'));
+      dsvg.append(seg);
+    }
+    a0 = a1;
+  }
+  const donutCard = card('Phosphorus by water status', 'Where Apetit\'s P load ends up (ecological status)', h('div', { class: 'card-b' }, dwrap,
+    h('div', { class: 'dleg' }, groups.map((x) => h('div', {}, h('span', { class: 'sw ' + STATUS[x.st] }), h('span', { text: `${x.st} (${x.n})` }), h('strong', { text: num((x.p / totP) * 100) + ' %' }))))));
+
+  // ---- details of the selected catchment
   const cal = nature.calibration;
   const facts = [
     ['Region', REG[cur.region]], ['Receiving water', cur.water_type], ['Ecological status', `${cur.status} (weight ${cur.state_weight})`],
@@ -550,28 +688,175 @@ function pageNature() {
     ['Monitored outlet load 2025 (all sources)', isNum(cur.monitored_total_p_kg_2025) ? `${num(cur.monitored_total_p_kg_2025)} kg P, ${num(cur.monitored_total_n_kg_2025)} kg N` : 'no station'],
     ['Priority score', num(cur.priority_score, 2)],
   ];
+  const detailCard = card(`${cur.catchment_id} – rank ${cur.rank}`, 'Catchment details', h('div', { class: 'card-b' },
+    h('table', { class: 'kv' }, h('tbody', {}, facts.map(([x, y]) => h('tr', {}, h('th', { text: x }), h('td', { text: y }))))),
+    h('div', { style: 'height:12px' }),
+    methodBox('Method', { formula: nature.method.formula, standard: nature.method.standard, actions: nature.method.actions }),
+    h('p', { class: 'small muted', text: `Calibration: decay length ${cal.decay_length_m} m; dev score ${num(cal.dev_score.score, 1)} vs baseline ${cal.baseline_dev_score}. ${cal.note}` })));
+
   return [
     pageHead('Nature: nutrient pressure on waters', 'Phosphorus (P) and nitrogen (N) from Apetit contract parcels reaching lakes and rivers in 2025, and where to act first (SBTN step 2, task D1).'),
-    h('div', { class: 'grid g2' },
-      card('Priority map', 'Click a catchment', h('div', { class: 'card-b' }, h('div', { class: 'maps' }, panel('FI_SW'), panel('SE_SKANE')),
-        h('div', { class: 'legend' }, [['#b8520a', 'Priority 1–5 (act first)'], ['#e07a1f', '6–12'], ['#f3ad62', '13–25'], ['#fbe3c6', '26+ (lower)'], ['#e6eadf', 'No Apetit parcels']]
-          .map(([c, t]) => h('span', {}, h('span', { class: 'sw', style: 'background:' + c }), t))),
-        h('p', { class: 'small muted', text: 'Synthetic catchment polygons placed in the real sourcing regions (not to the same scale).' }))),
-      card(`${cur.catchment_id} – rank ${cur.rank}`, 'Catchment details', h('div', { class: 'card-b' },
-        h('table', { class: 'kv' }, h('tbody', {}, facts.map(([a, b]) => h('tr', {}, h('th', { text: a }), h('td', { text: b }))))),
-        h('div', { style: 'height:12px' }),
-        methodBox('Method', { formula: nature.method.formula, standard: nature.method.standard, actions: nature.method.actions }),
-        h('p', { class: 'small muted', text: `Calibration: decay length ${cal.decay_length_m} m; dev score ${num(cal.dev_score.score, 1)} vs baseline ${cal.baseline_dev_score}. ${cal.note}` })))),
+    overview,
+    h('div', { class: 'grid g2 nat-row' }, mapCard, rankCard),
+    h('div', { class: 'grid g2' }, donutCard, detailCard),
     card('Top 10 catchments', 'Pressure × state of nature', h('div', { class: 'card-b tight' },
       table(['#', 'Catchment', 'Region', 'P kg', 'N kg', 'Status', 'Score', 'Review'], [3, 4, 6],
-        nature.catchments.slice(0, 10).map((c) => {
+        cats.slice(0, 10).map((c) => {
           const it = item('nature:' + c.catchment_id, `Catchment ${c.catchment_id} priority`, `Rank ${c.rank}: ${num(c.p_kg, 1)} kg P, ${num(c.n_kg)} kg N, status ${c.status}`,
             { formula: nature.method.formula, standard: nature.method.standard, files: nature.method.sources, assumptions: [nature.method.loads] });
           return h('tr', {}, h('td', { class: 'idx', text: c.rank }),
-            h('td', {}, h('button', { class: 'btn sm', type: 'button', text: c.catchment_id, onclick: () => { sel.id = c.catchment_id; render(); } })),
+            h('td', {}, h('button', { class: 'btn sm', type: 'button', text: c.catchment_id, onclick: () => choose(c) })),
             h('td', { text: REG[c.region] }), h('td', { class: 'num', text: num(c.p_kg, 1) }), h('td', { class: 'num', text: num(c.n_kg) }),
-            h('td', {}, h('span', { class: 'pill tag', text: c.status })), h('td', { class: 'num strong', text: num(c.priority_score, 2) }), h('td', {}, controls(it)));
+            h('td', {}, stChip(c.status)), h('td', { class: 'num strong', text: num(c.priority_score, 2) }), h('td', {}, controls(it)));
         })))),
+  ];
+}
+
+// ---------------------------------------------------------------- pathways (B1 targets + pathway, B2 MACC, D2 screening)
+const BUCKET = { s12: 'Scope 1+2', s3: 'Scope 3 non-FLAG', flag: 'FLAG (land)' };
+const BUCKET_KEY = { s12: 'c1', s3: 'c3', flag: 'c4' };
+function pagePathways() {
+  const P = S.data.pathways;
+  if (!P) return [pageHead('Pathways & targets', null), h('div', { class: 'empty', text: 'Run python3 run_all.py to create pathways.json.' })];
+  const st = S.ui.pathways = S.ui.pathways || { bucket: 'flag' };
+  const pw = P.pathway, yrs = pw.years, inv = P.inventory, fl = P.flag, by = P.base_year, m = P.method;
+  const i30 = yrs.indexOf(pw.target_year);
+  const srcB = { formula: m.targets, standard: 'SBTi near-term criteria; GHG Protocol; docs/SCENARIOS_AND_RISK.md Track B', files: m.sources, assumptions: [m.pathway, m.timing] };
+  const totalBase = pw.base.s12 + pw.base.s3 + pw.base.flag;
+
+  // ---- overview: hero + KPIs, and the pathway chart for one bucket
+  const kpi = (label, value, note) => h('div', { class: 'kp' }, h('span', { text: label }), h('strong', { text: value }), note ? h('small', { text: note }) : null);
+  const left = h('div', { class: 'ov-left' },
+    h('div', { class: 'ov-lbl', text: `Base year ${inv.year} · scope 1+2 (market) + 3` }),
+    h('div', { class: 'ov-hero' }, h('strong', { text: num(totalBase) }), h('span', { text: 't CO₂e' })),
+    h('div', { class: 'kp-grid' },
+      kpi('Scope 1+2 (market)', num(pw.base.s12) + ' t', '−4.2 %/yr target'),
+      kpi('Scope 3 non-FLAG', num(pw.base.s3) + ' t', '−2.5 %/yr target'),
+      kpi('FLAG (land)', num(pw.base.flag) + ' t', `${num(fl.flag_share_of_cat01 * 100)} % of category 1 · −3.03 %/yr`),
+      kpi('Category 1 share', num(inv.cat01 / inv.scope3 * 100) + ' %', 'of scope 3'),
+      kpi('Levers (design)', num(P.macc_total_t) + ' t/yr', 'real abatement only'),
+      kpi('Foodhills growers', '+' + num(by.foodhills.tco2e) + ' t', `${num(by.foodhills.share_of_scope3 * 100, 1)} % of scope 3 (< 5 %)`)));
+
+  const b = st.bucket;
+  const series = [
+    { key: 'c5', name: `SBTi target (−${num(pw.target_reduction[b] * 100, 1)} % by ${pw.target_year})`, points: yrs.map((y, i) => [y, pw.target[b][i]]), dash: true },
+    { key: 'c3', name: pw.scenarios.below_2c.label, points: yrs.map((y, i) => [y, pw.scenarios.below_2c.series[b][i]]), area: true, dots: true },
+    { key: 'c1', name: pw.scenarios.delayed_transition.label, points: yrs.map((y, i) => [y, pw.scenarios.delayed_transition.series[b][i]]) },
+  ];
+  const gapChip = (key) => {
+    const g = pw.gap[key][b][i30];
+    return h('div', { class: 'gap-row' }, h('span', { text: pw.scenarios[key].label }),
+      h('span', { class: 'delta ' + (g <= 0 ? 'good' : 'bad'), text: g <= 0 ? `On track (${num(-g)} t below target)` : `Gap ${num(g)} t in ${pw.target_year}` }));
+  };
+  const bucketTabs = h('div', { class: 'seg-ctl', role: 'radiogroup', 'aria-label': 'Emission group' },
+    Object.entries(BUCKET).map(([k, t]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(k === b), class: k === b ? 'on' : null, text: t, onclick: () => { st.bucket = k; render(); } })));
+  const overview = card('Targets and pathway', 'SBTi near-term targets vs two NGFS transition scenarios (B1)', h('div', { class: 'card-b' },
+    h('div', { class: 'ov' }, left, h('div', { class: 'ov-chart' },
+      h('div', { class: 'ov-lbl', text: `${BUCKET[b]}, t CO₂e per year` }),
+      lineChart(series, { label: `${BUCKET[b]} pathway`, unit: 't', xstep: 2, h: 260 }),
+      h('div', { class: 'gaps' }, gapChip('below_2c'), gapChip('delayed_transition'))))), bucketTabs);
+
+  // ---- MACC: width = abatement, height = € per tonne
+  const lv = P.levers.filter((l) => l.kind === 'abatement' && l.abatement_t > 0 && isNum(l.cost_eur_per_t)).sort((x, y) => x.cost_eur_per_t - y.cost_eur_per_t);
+  const narrow = window.innerWidth < 640;
+  const W = narrow ? 420 : 1000, H = 320, L = 52, R = 12, T = 20, B = 34, CAP = 300, LOW = -200;
+  const tot = lv.reduce((a, l) => a + l.abatement_t, 0);
+  const X = (v) => L + (v / tot) * (W - L - R), Y = (v) => T + ((CAP - Math.max(LOW, Math.min(CAP, v))) / (CAP - LOW)) * (H - T - B);
+  const msvg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart macc', role: 'img', 'aria-label': 'Marginal abatement cost curve: ' + lv.map((l) => `${l.lever_id} ${num(l.abatement_t)} t at ${num(l.cost_eur_per_t)} €/t`).join(', ') });
+  for (const v of [-200, -100, 0, 100, 200, 300]) msvg.append(s('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: 'grid-line' + (v === 0 ? ' zero' : '') }), s('text', { x: L - 8, y: Y(v) + 4, 'text-anchor': 'end' }, v));
+  msvg.append(s('text', { x: 2, y: 12, class: 'ylab' }, '€/t'));
+  for (let v = 0; v <= tot; v += 10000) msvg.append(s('text', { x: X(v), y: H - 12, 'text-anchor': 'middle' }, v ? num(v / 1000) + 'k t' : '0'));
+  const mtip = vizTip();
+  const mwrap = h('div', { class: 'viz' }, msvg, mtip);
+  const gB = { s12: grad(msvg, 'gr-mode c1', true), s3: grad(msvg, 'gr-mode c3', true), flag: grad(msvg, 'gr-mode c4', true) };
+  let cum = 0;
+  for (const l of lv) {
+    const x0 = X(cum), x1 = X(cum + l.abatement_t), c = l.cost_eur_per_t;
+    const y0 = Y(0), yv = Y(c);
+    const it = item('lever:' + l.lever_id, `${l.lever_id} ${l.name}`, `${num(l.abatement_t)} t CO₂e/yr by 2030 (range ${num(l.abatement_low)}–${num(l.abatement_high)}), ${num(c)} €/t`,
+      { formula: m.macc, files: ['data/05_scenarios/decarbonisation_levers.csv ' + l.lever_id], assumptions: [`confidence ${l.confidence}`, l.co_benefits ? 'co-benefits: ' + l.co_benefits : '', l.trade_offs ? 'trade-offs: ' + l.trade_offs : '', l.note || ''].filter(Boolean) });
+    const g = s('g', { class: 'mbar' + (l.in_pathway ? '' : ' out'), tabindex: '0', role: 'button', 'aria-label': `${l.lever_id} ${l.name}: ${num(l.abatement_t)} t, ${num(c)} euro per tonne` },
+      s('rect', { x: x0 + 0.6, y: Math.min(y0, yv), width: Math.max(1.5, x1 - x0 - 1.2), height: Math.max(1.5, Math.abs(y0 - yv)), rx: 3, fill: gB[l.bucket] || gB.s3 }));
+    if ((c > CAP || c < LOW) && x1 - x0 > 10) g.append(s('text', { x: (x0 + x1) / 2, y: c > 0 ? T - 4 : H - B + 12, 'text-anchor': 'middle', class: 'mcap' }, num(c)));
+    if (x1 - x0 > 26) g.append(s('text', { x: (x0 + x1) / 2, y: c >= 0 ? Math.min(y0, yv) - 4 : Math.max(y0, yv) + 12, 'text-anchor': 'middle', class: 'mlab' }, l.lever_id));
+    const show = (xPx) => {
+      fillTip(mtip, `${l.lever_id} · ${l.name}`, [{ key: BUCKET_KEY[l.bucket] || 'c3', value: num(l.abatement_t) + ' t', name: `${num(l.abatement_low)}–${num(l.abatement_high)} t (${l.confidence})` },
+        { key: 'kearth', value: num(c) + ' €/t', name: BUCKET[l.bucket] || '' }].concat(l.note ? [{ key: 'kghost', value: '', name: l.note }] : []));
+      placeTip(mwrap, mtip, xPx);
+    };
+    g.addEventListener('pointerenter', () => show((((x0 + x1) / 2) / W) * msvg.getBoundingClientRect().width));
+    g.addEventListener('focus', () => show((((x0 + x1) / 2) / W) * msvg.getBoundingClientRect().width));
+    g.addEventListener('click', () => showSource(it));
+    msvg.append(g);
+    cum += l.abatement_t;
+  }
+  for (const [key, cls] of [['below_2c', 'cp1'], ['delayed_transition', 'cp2']]) {
+    const v = pw.scenarios[key].carbon_price_2030;
+    msvg.append(s('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: 'cprice ' + cls }), s('text', { x: L + 8, y: Y(v) + (key === 'below_2c' ? -5 : 13), 'text-anchor': 'start', class: 'cptxt ' + cls }, `${key === 'below_2c' ? 'Orderly' : 'Delayed'} carbon price 2030: ${num(v)} €/t`));
+  }
+  msvg.addEventListener('pointerleave', () => mtip.classList.remove('on'));
+  const notRed = P.levers.filter((l) => l.kind !== 'abatement' || l.note);
+  const cheap = lv.filter((l) => l.cost_eur_per_t <= pw.scenarios.below_2c.carbon_price_2030);
+  const macc = card('Abatement cost curve (MACC)', `${lv.length} levers · ${num(tot)} t CO₂e/yr by 2030 · tap a bar for its source (B2)`, h('div', { class: 'card-b' }, mwrap,
+    h('div', { class: 'legend' }, h('span', {}, h('span', { class: 'sw c1' }), 'Scope 1+2'), h('span', {}, h('span', { class: 'sw c3' }), 'Scope 3 non-FLAG'), h('span', {}, h('span', { class: 'sw c4' }), 'FLAG (land)'),
+      h('span', { text: 'Width = t CO₂e/yr, height = €/t' })),
+    h('p', { class: 'small' }, h('strong', { text: `${cheap.length} levers (${num(cheap.reduce((a, l) => a + l.abatement_t, 0))} t) cost less than the orderly 2030 carbon price. ` }),
+      'The three cheapest large levers are all FLAG: shift off peat soils (L11), rapeseed supplier engagement (L13) and pizza recipe (L16).'),
+    h('div', { class: 'notred' }, h('strong', { text: 'Not counted as reductions: ' }),
+      notRed.map((l) => h('span', { class: 'pill tag', title: l.note || l.trade_offs || '', text: `${l.lever_id} ${l.kind === 'measurement' ? 'measurement change' : l.kind === 'structural' ? 'structural change' : 'outside 2024 base'}` }))),
+    h('p', { class: 'small muted', text: m.macc })));
+
+  // ---- targets table with review
+  const tItems = Object.keys(BUCKET).map((k) => item('target:' + k, `${BUCKET[k]} target ${pw.target_year}`,
+    `Base ${num(pw.base[k])} t → target ${num(pw.target[k][i30])} t (−${num(pw.target_reduction[k] * 100, 1)} %)`, srcB));
+  const targets = card(`Targets for ${pw.target_year}`, `Linear from the ${inv.year} base; gap = pathway − target`, h('div', { class: 'card-b tight' },
+    table(['Group', 'Base t', 'Target t', 'Orderly t', 'Delayed t', 'Review'], [1, 2, 3, 4],
+      Object.keys(BUCKET).map((k, i) => {
+        const o = pw.scenarios.below_2c.series[k][i30], d = pw.scenarios.delayed_transition.series[k][i30], tg = pw.target[k][i30];
+        return h('tr', {}, h('td', { class: 'strong', text: BUCKET[k] }), h('td', { class: 'num', text: num(pw.base[k]) }), h('td', { class: 'num strong', text: num(tg) }),
+          h('td', { class: 'num ' + (o <= tg ? 'ok-txt' : 'bad-txt'), text: num(o) }), h('td', { class: 'num ' + (d <= tg ? 'ok-txt' : 'bad-txt'), text: num(d) }), h('td', {}, controls(tItems[i])));
+      })),
+    h('div', { class: 'card-b' }, h('p', { class: 'small', text: m.timing }),
+      h('p', { class: 'small muted', text: `Scope 3 coverage: category 1 is ${num(P.coverage[0].share * 100)} % of scope 3 and the only category above 5 %, so a target on category 1 covers V2's rule.` }))));
+
+  // ---- base year
+  const o19 = by.option_2019, fh = by.foodhills;
+  const byItem = item('baseyear:choice', 'Base-year choice and recalculation', `2019 published ${num(o19.published_scope3)} t scope 3, recalculated ${num(o19.scope3_recalculated_low)}–${num(o19.scope3_recalculated_high)} t; ${inv.year} base ${num(by.option_recent.scope3)} t`,
+    { formula: by.rule, files: ['data/05_scenarios/published_inventory_history.csv', 'data/05_scenarios/structural_events.csv', 'tasks/dev/A2_dev_inventory_2024.csv', 'data/03_farming/foodhills_odlingsdata_se.csv'], assumptions: [o19.note, fh.note] });
+  const baseCard = card('Base year and recalculation', by.rule, h('div', { class: 'card-b' },
+    h('div', { class: 'bopt' },
+      h('div', { class: 'bo' }, h('span', { class: 'bo-t', text: 'Option A · 2019 (programme base)' }), h('strong', { text: `${num(o19.scope3_recalculated_low)}–${num(o19.scope3_recalculated_high)} t` }),
+        h('small', { text: `Scope 3 after removing grain trade (${num(o19.grain_trade_share_low * 100, 1)}–${num(o19.grain_trade_share_high * 100, 1)} %, from Apetit's own restatements). Published: ${num(o19.published_scope3)} t.` })),
+      h('div', { class: 'bo on' }, h('span', { class: 'bo-t', text: `Option B · ${inv.year} (recommended)` }), h('strong', { text: `${num(by.option_recent.scope3)} t` }),
+        h('small', { text: 'Latest complete inventory; SBTi V2 prefers the latest year. Replace with 2025 once task A2 is done.' }))),
+    h('div', { class: 'fh' }, h('span', { class: 'delta flat', text: `Foodhills growers: +${num(fh.tco2e)} t (${num(fh.share_of_scope3 * 100, 1)} % of scope 3)` }),
+      h('span', { class: 'small muted', text: `${num(fh.delivered_t)} t peas (${fh.year}) × ${fh.factor_kg_per_kg} kg CO₂e/kg. Below the 5 % trigger on its own, but add it together with Bjuv's own scope 1+2.` })),
+    h('ul', { class: 'events' }, by.events.map((e) => h('li', {}, h('span', { class: 'small muted', text: e.date }), ' ', e.event, h('span', { class: 'small muted', text: ' · ' + e.relevance })))),
+    h('div', { class: 'toolbar', style: 'margin-top:8px' }, controls(byItem))));
+
+  // ---- D2 screening
+  const sc = P.screening;
+  const prioCls = { high: 'bad', medium: 'flat', low: 'good', 'not screened': 'flat' };
+  const rows = sc.rows.filter((r) => r.screened).slice(0, 14);
+  const d2 = card(`Value-chain nature screening (${sc.year} purchases)`, 'What Apetit buys, from where, and the state of nature there (SBTN step 1, D2)', h('div', { class: 'card-b tight' },
+    table(['Priority', 'Material', 'Origin', 't', 't CO₂e', 'Water stress', 'Deforestation', 'Biodiversity', 'Nutrients', 'Review'], [3, 4],
+      rows.map((r) => {
+        const it = item(`screen:${r.material_id}:${r.origin}`, `${r.material} from ${r.origin}`, `${num(r.t)} t, ${num(r.tco2e)} t CO₂e, nature score ${num(r.nature_score, 1)}`,
+          { formula: sc.method, files: ['data/02_raw_feeds/erp_purchase_lines_2021_2025.csv', 'data/06_nature/origin_state_of_nature_indicative.csv', 'data/01_master/materials.csv'], assumptions: [sc.eudr_note] });
+        return h('tr', {}, h('td', {}, h('span', { class: 'delta ' + prioCls[r.priority], text: r.priority })),
+          h('td', {}, h('strong', { text: r.material }), r.high_impact ? h('span', { class: 'pill tag', style: 'margin-left:6px', text: 'SBTN high-impact' }) : null),
+          h('td', { text: r.origin }), h('td', { class: 'num', text: num(r.t) }), h('td', { class: 'num', text: num(r.tco2e) }),
+          h('td', { text: r.water_stress + ' / 4' }), h('td', { text: r.deforestation }), h('td', { text: r.biodiversity }), h('td', { class: 'small', text: r.nutrients }), h('td', {}, controls(it)));
+      })),
+    h('div', { class: 'card-b' }, h('p', { class: 'small', text: sc.eudr_note }), h('p', { class: 'small muted', text: sc.method }))));
+
+  return [
+    pageHead('Pathways & targets', 'SBTi targets with a FLAG split, a pathway under two NGFS scenarios, the abatement cost curve and a value-chain nature screening (tasks B1, B2, D2).'),
+    h('div', { class: 'banner-note' }, icon('info'), h('span', { text: `Starts from the ${inv.year} inventory in the package (tasks/dev), because our own 2025 inventory (task A2) is not built yet. Lever values are the package's design estimates.` })),
+    overview,
+    macc,
+    h('div', { class: 'grid g2' }, targets, baseCard),
+    d2,
   ];
 }
 
@@ -938,6 +1223,7 @@ const PAGES = [
   { group: 'Analysis', key: 'climate', label: 'Climate Risk', icon: 'cloud', fn: pageClimate },
   { group: 'Analysis', key: 'nature', label: 'Nature Map', icon: 'map', fn: pageNature },
   { group: 'Analysis', key: 'transport', label: 'Transport CO₂', icon: 'truck', fn: pageTransport },
+  { group: 'Analysis', key: 'pathways', label: 'Pathways & targets', icon: 'trend', fn: pagePathways },
   { group: 'Assistant', key: 'copilot', label: 'AI Copilot', icon: 'bot', fn: pageCopilot },
   { group: 'Governance', key: 'review', label: 'Review & Audit Log', icon: 'check', fn: pageReview, need: 'see_corrections', badge: true },
   { group: 'Governance', key: 'users', label: 'Users & Roles', icon: 'users', fn: pageUsers, need: 'admin' },
@@ -1083,7 +1369,7 @@ async function boot() {
   if (!S.me) return renderLogin();
   document.getElementById('root').replaceChildren(h('p', { class: 'empty', text: 'Loading results…' }));
   try {
-    const names = ['climate', 'nature', 'transport', 'actions', 'corrections', 'meta'];
+    const names = ['climate', 'nature', 'transport', 'actions', 'pathways', 'corrections', 'meta'];
     const vals = await Promise.all(names.map((n) => api('/api/data/' + n)));
     names.forEach((n, i) => { S.data[n] = vals[i]; });
     S.health = await api('/api/health');
@@ -1102,6 +1388,6 @@ window.addEventListener('hashchange', () => { closeMenus(); if (S.me) render(); 
 document.addEventListener('click', () => { if (S.ui.menu) { S.ui.menu = null; if (S.me) render(); } });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.ui.menu) { S.ui.menu = null; render(); } });
 window.addEventListener('error', (e) => console.error('TerraTrace error:', e.message));
-S.ui = { climate: { combo: 'FI_SW|pea', scen: 'ssp245' }, nature: { id: null }, copilot: { q: '', answer: '', info: '', busy: false }, menu: null };
+S.ui = { climate: { combo: 'FI_SW|pea', scen: 'ssp245' }, nature: { id: null, region: null }, copilot: { q: '', answer: '', info: '', busy: false }, menu: null };
 applyTheme();
 boot();

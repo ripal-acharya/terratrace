@@ -209,3 +209,48 @@ class TestMcpAndSigning(unittest.TestCase):
         man["files"][0]["sha256"] = "b" * 64
         with self.assertRaises(Exception):
             key.public_key().verify(sig, signing.canonical(man))
+
+
+class TestPathways(unittest.TestCase):
+    """B1/B2/D2 output (app/data/pathways.json)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.p = json.loads((ROOT / "app" / "data" / "pathways.json").read_text(encoding="utf-8"))
+
+    def test_sbti_rates_and_linear_target(self):
+        pw = self.p["pathway"]
+        y0, rates = pw["years"][0], {"s12": 0.042, "s3": 0.025, "flag": 0.0303}
+        i = pw["years"].index(pw["target_year"])
+        for b, r in rates.items():
+            self.assertAlmostEqual(pw["target"][b][i], pw["base"][b] * (1 - r * (pw["target_year"] - y0)), places=3)
+
+    def test_flag_split_adds_up(self):
+        f, inv = self.p["flag"], self.p["inventory"]
+        self.assertTrue(0 < f["flag_share_of_cat01"] < 1)
+        self.assertAlmostEqual(f["flag_tco2e"] + f["scope3_non_flag_tco2e"], inv["scope3"], places=3)
+        # the quick category 1 estimate from ERP x factors should be close to the inventory (sanity check)
+        self.assertLess(abs(f["cat01_quick_estimate"] / f["cat01_from_inventory"] - 1), 0.10)
+
+    def test_measurement_and_structural_levers_are_not_reductions(self):
+        lv = {l["lever_id"]: l for l in self.p["levers"]}
+        for k in ("L05", "L26", "L27"):
+            self.assertFalse(lv[k]["in_pathway"], k)
+        self.assertFalse(lv["L07"]["in_pathway"])          # Bjuv is outside the 2024 base
+        self.assertEqual(lv["L27"]["kind"], "measurement")
+
+    def test_pathway_never_below_zero_and_delay_is_worse(self):
+        sc = self.p["pathway"]["scenarios"]
+        for k in sc:
+            for b, ser in sc[k]["series"].items():
+                self.assertTrue(all(v >= 0 for v in ser))
+        i = self.p["pathway"]["years"].index(2030)
+        for b in ("s12", "s3", "flag"):
+            self.assertGreaterEqual(sc["delayed_transition"]["series"][b][i], sc["below_2c"]["series"][b][i])
+
+    def test_screening_rows_have_priority(self):
+        rows = self.p["screening"]["rows"]
+        self.assertTrue(rows)
+        self.assertTrue(all(r["priority"] in ("high", "medium", "low", "not screened") for r in rows))
+        soy = [r for r in rows if r["material_id"] == "M130"]
+        self.assertTrue(soy and soy[0]["priority"] == "high" and soy[0]["high_impact"])
