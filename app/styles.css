@@ -620,3 +620,9 @@ th,td{padding:12px 10px}
 th:first-child,td:first-child{padding-left:18px}
 th:last-child,td:last-child{padding-right:16px}
 td:has(> .acts){width:1%;white-space:nowrap}
+.sig{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.sig-ico{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--soft);color:var(--muted);flex:none}
+.sig-ico.ok{background:var(--brand-2);color:var(--brand-ink)}
+.sig-ico svg{width:24px;height:24px}
+.sig-main{flex:1;min-width:240px}
+.sig-main p{margin:6px 0 0}

@@ -523,7 +523,7 @@ function pageNature() {
   const byId = Object.fromEntries(nature.catchments.map((c) => [c.catchment_id, c]));
   const sel = S.ui.nature;
   const feats = nature.geojson.features.filter((f) => f.geometry && f.geometry.type === 'Polygon');
-  const color = (c) => (!c || c.p_kg <= 0 ? '#d7dde2' : c.rank <= 5 ? '#d14343' : c.rank <= 12 ? '#e98a3c' : c.rank <= 25 ? '#f2c14e' : '#a9d3b4');
+  const color = (c) => (!c || c.p_kg <= 0 ? '#e6eadf' : c.rank <= 5 ? '#b8520a' : c.rank <= 12 ? '#e07a1f' : c.rank <= 25 ? '#f3ad62' : '#fbe3c6');
   const panel = (region) => {
     const fs = feats.filter((f) => f.properties.region === region);
     if (!fs.length) return null;
@@ -554,7 +554,7 @@ function pageNature() {
     pageHead('Nature: nutrient pressure on waters', 'Phosphorus (P) and nitrogen (N) from Apetit contract parcels reaching lakes and rivers in 2025, and where to act first (SBTN step 2, task D1).'),
     h('div', { class: 'grid g2' },
       card('Priority map', 'Click a catchment', h('div', { class: 'card-b' }, h('div', { class: 'maps' }, panel('FI_SW'), panel('SE_SKANE')),
-        h('div', { class: 'legend' }, [['#d14343', 'Rank 1–5'], ['#e98a3c', '6–12'], ['#f2c14e', '13–25'], ['#a9d3b4', '26+'], ['#d7dde2', 'No Apetit parcels']]
+        h('div', { class: 'legend' }, [['#b8520a', 'Priority 1–5 (act first)'], ['#e07a1f', '6–12'], ['#f3ad62', '13–25'], ['#fbe3c6', '26+ (lower)'], ['#e6eadf', 'No Apetit parcels']]
           .map(([c, t]) => h('span', {}, h('span', { class: 'sw', style: 'background:' + c }), t))),
         h('p', { class: 'small muted', text: 'Synthetic catchment polygons placed in the real sourcing regions (not to the same scale).' }))),
       card(`${cur.catchment_id} – rank ${cur.rank}`, 'Catchment details', h('div', { class: 'card-b' },
@@ -807,6 +807,27 @@ function pageCopilot() {
   ];
 }
 
+function releaseCard(approved) {
+  const r = S.release || {};
+  const has = !r.error && r.signed_at;
+  const changed = (r.files || []).filter((f) => f.state !== 'OK');
+  const signIt = async () => {
+    try { S.release = await api('/api/release/sign', { method: 'POST', body: {} }); await refreshReviews(); render(); }
+    catch (e) { if (e.message !== 'signed out') openDialog(h('h3', { text: 'Not signed' }), h('p', { text: e.message }), h('div', { class: 'dlg-actions' }, closeBtn())); }
+  };
+  const badge = !has ? h('span', { class: 'delta flat', text: 'Not signed yet' })
+    : r.ok ? h('span', { class: 'delta good' }, icon('check'), 'Signature valid · nothing changed')
+      : h('span', { class: 'delta bad' }, icon('x'), 'Changed after signing');
+  return card('Signed results (digital signature)', 'Ed25519 signature over the SHA-256 hash of every result file and every approval', h('div', { class: 'card-b' },
+    h('div', { class: 'sig' },
+      h('div', { class: 'sig-ico' + (has && r.ok ? ' ok' : '') }, icon('lock')),
+      h('div', { class: 'sig-main' }, badge,
+        has ? h('p', { class: 'small muted', text: `Signed ${localTime(r.signed_at)} · ${r.approved_results} approved results · key ${r.key_fingerprint} · audit log continues: ${r.audit_continues ? 'yes' : 'no'}` })
+          : h('p', { class: 'small muted', text: r.error || 'Sign the approved results so auditors can check that no number changes later.' }),
+        changed.length ? h('p', { class: 'small', text: 'Changed: ' + changed.map((f) => f.path).join(', ') }) : null,
+        h('p', { class: 'small muted', text: `AI agent access (MCP server): ${r.mcp_calls || 0} read-only calls logged · verify anywhere with: python3 signing.py verify` })),
+      can('review') ? h('button', { class: 'btn primary', type: 'button', disabled: approved === 0, onclick: signIt }, icon('lock'), has ? 'Sign again' : 'Sign approved results') : null)));
+}
 function pageReview() {
   const { corrections } = S.data;
   const corr = corrections.entries.map((c) => item(`corr:${c.record_key}`, `Correction ${c.record_key}`,
@@ -828,6 +849,7 @@ function pageReview() {
         corrections.entries.map((c, i) => h('tr', {}, h('td', {}, h('code', { text: c.record_key })), h('td', { text: c.field }),
           h('td', { class: 'nowrap', text: `${c.old_value ?? '–'} → ${c.new_value ?? 'excluded'}` }), h('td', { class: 'small wide', text: c.rule_or_model }),
           h('td', { class: 'small wide', text: c.evidence }), h('td', {}, controls(corr[i])))), 'No corrections visible for your role.'))),
+    releaseCard(approved),
     card(`Audit log (${audit.length} entries)`, 'Who decided what, and when. Stored on the server; nobody can edit or delete entries.', h('div', { class: 'card-b tight' },
       table(['Time (UTC)', 'Record', 'Old → new', 'By', 'Comment'], [],
         audit.map((e) => h('tr', {}, h('td', { class: 'small', text: e.timestamp }), h('td', {}, h('code', { text: e.record_key })),
@@ -1050,8 +1072,8 @@ async function logout() {
   renderLogin('You are signed out.');
 }
 async function refreshReviews() {
-  const [rv, au] = await Promise.all([api('/api/reviews'), api('/api/audit')]);
-  S.reviews = rv || {}; S.audit = au;
+  const [rv, au, rl] = await Promise.all([api('/api/reviews'), api('/api/audit'), api('/api/release').catch(() => null)]);
+  S.reviews = rv || {}; S.audit = au; S.release = rl;
 }
 async function boot() {
   try {

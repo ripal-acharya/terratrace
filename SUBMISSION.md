@@ -17,11 +17,11 @@ data correction is logged, and nothing is exported until a reviewer approves it.
 Checks: our 2023–2024 transport totals match Apetit's public dev inventory; 8/8 missing legs found;
 the yield model beats the baseline for every crop in a 2023–2026 back-test.
 
-**Built with:** Python, pandas, NumPy, JavaScript (no framework), SVG charts, Featherless AI (OpenAI-compatible API)
+**Built with:** Python, pandas, NumPy, JavaScript (no framework), SVG charts, Google Gemini API
 
-**AI tools used:** Claude (coding assistant), Featherless AI (Copilot answers)
+**AI tools used:** Claude (coding assistant), Google Gemini (Copilot answers)
 
-**Partner technologies:** Featherless AI
+**Partner technologies / MLH:** Best Use of Gemini API
 
 ---
 

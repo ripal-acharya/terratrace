@@ -29,7 +29,8 @@ Requirements: Python 3.9+ with pandas and numpy. No Node.js, no build step, no i
 python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python3 run_all.py          # raw Apetit package -> app/data/*.json + submissions/*.csv (about 2 s)
-python3 server.py           # open http://127.0.0.1:8000
+python3 manage_users.py demo   # once: creates demo users and prints their passwords one time
+python3 server.py           # open http://127.0.0.1:8000 and sign in
 ```
 
 The pipeline looks for the unzipped package next to this folder
@@ -42,10 +43,20 @@ Tests (formulas, submission formats, data checks, security checks):
 python3 -m unittest discover -s tests -v
 ```
 
-### Optional: free-text AI in the Copilot
+### Optional: free-text AI in the Copilot (Google Gemini)
 
-Copy `.env.example` to `.env` and add a Featherless API key (`FEATHERLESS_API_KEY=...`).
-Without a key the app still runs and the suggested questions are answered directly from the results.
+The Copilot works with any OpenAI-compatible API. In the demo we use **Google Gemini**.
+Copy `.env.example` to `.env` and set:
+
+```
+FEATHERLESS_API_KEY=<your Gemini API key from aistudio.google.com>
+FEATHERLESS_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+FEATHERLESS_MODEL=gemini-3.6-flash
+FEATHERLESS_FALLBACK_MODEL=gemini-3.5-flash-lite
+```
+
+If the main model is busy, the server tries the backup model once. Without a key the app still
+runs and the suggested questions are answered directly from the results.
 
 ## Submissions for the auto-scored tasks
 
@@ -88,14 +99,44 @@ Measurement improvements are not reductions: lever L27 is shown as "not a reduct
 
 ## Security
 
-* Server binds to `127.0.0.1` only and serves files only from `app/` (no directory listing).
-* Strict Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, `no-referrer`.
-* The page never inserts HTML from data or AI answers (text only), so no script injection.
-* Copilot API: 8 KB request limit, 1,000-character questions, 10 questions per minute per client,
-  origin check, 20 s first-token timeout with one automatic retry, 60 s total, 800-token answers.
-* The AI only reads results; it cannot change data. The API key stays in `.env` on the server
-  (in `.gitignore`), never in the browser or the repository.
-* CSV export escapes spreadsheet formulas.
+* **Sign-in, invite-only.** No public sign-up. Accounts are created with `manage_users.py`. Passwords are
+  stored only as salted PBKDF2-SHA256 hashes (240,000 iterations) in `instance/` (git-ignored).
+* **Sessions.** Random 256-bit token in an HttpOnly, SameSite=Strict cookie; 8-hour expiry; logout ends it.
+* **Brute-force protection.** 10 login attempts per minute per client; 10 failures lock an account for 5 minutes.
+  Unknown emails take the same time as known ones (no user enumeration).
+* **Roles, checked on the server for every request (need to know).**
+  viewer = totals only; reviewer = approve/reject + corrections (farm records by code); farm_advisor = farm-level
+  records by code; admin = user list, no farm-level records by default.
+* **Data is never served as static files.** Results are only returned by the API to signed-in users, filtered by role.
+* **Tamper-evident audit log.** Every decision is appended to `instance/audit_log.jsonl` with a SHA-256 hash
+  chain; the app shows whether the chain is intact. Nobody can edit or delete entries through the app.
+* **CSRF protection.** State-changing requests need a same-origin request and the header `X-TerraTrace: 1`.
+* **Browser hardening.** Strict Content-Security-Policy (no inline scripts), X-Frame-Options DENY, nosniff,
+  no-referrer, Permissions-Policy. All text is inserted as text (never HTML), so data and AI answers cannot run code.
+* **Copilot.** Login required; 1,000 characters; 10 questions per minute per user; 8 KB request limit; the API
+  key stays in `.env` on the server; only a short summary of results is sent, never farm-level rows.
+* **CSV export** (reviewers and admins) contains approved results only and escapes spreadsheet formulas.
+* The server binds to `127.0.0.1` only. Tests: `python3 -m unittest discover -s tests -v` (19 tests).
+
+## Using real Apetit data (privacy by design)
+
+The hackathon uses synthetic data, so its results are public in this repository. With real data the
+same code runs, but these rules apply:
+
+* **Never commit real data or results.** Add `app/data/` and `submissions/` to `.gitignore` in the
+  company copy; run the pipeline inside Apetit's own environment (Fabric / Azure).
+* **Results are private.** The web app reads results from private storage that only signed-in users
+  can access (no public URLs).
+* **Sign-in and roles.** Microsoft Entra ID single sign-on; roles viewer, reviewer, admin. Only
+  reviewers approve; only admins upload new results. The audit log is append-only.
+* **AI in Apetit's own tenant.** Free public AI APIs may use prompts to improve their products, so
+  real data goes only to an enterprise AI service in the EU with no training on customer data
+  (Azure OpenAI / Azure AI Foundry under Apetit's agreement). Only short result summaries are sent,
+  never raw files.
+* **Farmer data is personal data (GDPR).** Use pseudonymous farm IDs in the app, show no names or
+  exact home locations, keep only what is needed, set retention periods, and sign data processing
+  agreements with every vendor. Hosting and backups in the EU.
+* **Secrets** in Azure Key Vault; access and changes logged.
 
 ## Path to Apetit's Microsoft stack
 
@@ -103,9 +144,9 @@ Measurement improvements are not reductions: lever L27 is shown as "not a reduct
 |---|---|---|
 | Storage | CSV / JSON files | Fabric Lakehouse: raw feeds = bronze, cleaned tables = silver, results = gold |
 | Pipelines | `run_all.py` | Fabric notebooks / Data Factory |
-| Copilot | Featherless (OpenAI-compatible) | Azure AI Foundry Agent Service + Azure AI Search over framework documents |
-| Review & approval | Web app + browser storage | Power Apps approval flow; audit log as a Delta table |
-| Sign-in and secrets | none (local demo) | Microsoft Entra ID roles (viewer, reviewer, admin); Azure Key Vault |
+| Copilot | Google Gemini via OpenAI-compatible API | Azure AI Foundry Agent Service + Azure AI Search over framework documents |
+| Review & approval | Web app + server-side, hash-chained audit log | Power Apps approval flow; audit log as a Delta table |
+| Sign-in and secrets | Invite-only email + password, server-side roles | Microsoft Entra ID roles (viewer, reviewer, admin); Azure Key Vault |
 | Hosting | local Python server | Azure App Service; a tab in Microsoft Teams |
 
 ## Limitations
@@ -113,7 +154,6 @@ Measurement improvements are not reductions: lever L27 is shown as "not a reduct
 * Synthetic data; one weather realisation per SSP; no CO₂ fertilisation and no new varieties.
 * Earlier sowing and tolerant varieties are not modelled; irrigation is.
 * The nature model is a simple export-coefficient model calibrated on six catchments.
-* Review decisions are stored in the browser in this demo (see production path above).
 * Not covered yet: full GHG inventory (A2) and SBTi pathways (B). These are the next steps.
 
 ## Project structure
@@ -128,3 +168,25 @@ tests/              unit tests
 ```
 
 Data: Apetit × Since AI synthetic package v1.0.0 (CC BY 4.0). Code: MIT.
+
+## Trust layer: signed results + MCP server for AI agents
+
+**Signed results (Ed25519).** After review, a reviewer clicks *Sign approved results* (Review page) or runs
+`python3 signing.py sign`. This writes `submissions/terratrace_release.json`: the SHA-256 hash of every result
+file, every approval from the audit log, and the audit-log head, signed with an Ed25519 key. Anyone can check it:
+
+    python3 signing.py verify     # OK, or names every file changed after signing
+
+The private key stays in `instance/` (git-ignored). The public key is `submissions/terratrace_signing_public.pem`.
+
+**MCP server.** `mcp_server.py` exposes TerraTrace to AI agents through the Model Context Protocol
+(e.g. Microsoft Copilot Studio, Claude Desktop). Tools: `list_next_week_actions`, `get_climate_risk`,
+`get_nature_priorities`, `get_transport_emissions`, `verify_signed_release`.
+* all tools are read-only (no approve, no write);
+* only human-approved results are returned by default; every result carries its review status and sources;
+* no farm-level data is exposed;
+* every call is written to a hash-chained access log (`instance/mcp_access_log.jsonl`).
+
+Claude Desktop (Settings → Developer → Edit config):
+
+    {"mcpServers": {"terratrace": {"command": "/full/path/to/python3", "args": ["/full/path/to/terratrace/mcp_server.py"]}}}

@@ -170,3 +170,42 @@ class TestSecurity(unittest.TestCase):
         self.assertIn("_review_lock", src)          # check + write is one step
         self.assertIn("self._json(409", src)        # a second decision is refused
         self.assertIn('"Unknown result."', src)     # made-up keys are refused
+
+
+class TestMcpAndSigning(unittest.TestCase):
+    def _rpc(self, *msgs):
+        import subprocess, sys as _s
+        inp = "\n".join(json.dumps(m) for m in msgs) + "\n"
+        out = subprocess.run([_s.executable, str(ROOT / "mcp_server.py")], input=inp, capture_output=True, text=True, timeout=60).stdout
+        return [json.loads(l) for l in out.splitlines() if l.strip()]
+
+    def test_mcp_tools_are_read_only_and_approved_only(self):
+        r = self._rpc({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}},
+                      {"jsonrpc": "2.0", "method": "notifications/initialized"},
+                      {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+                      {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "list_next_week_actions", "arguments": {}}},
+                      {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "approve", "arguments": {}}})
+        by = {m["id"]: m for m in r}
+        self.assertEqual(by[1]["result"]["serverInfo"]["name"], "terratrace")
+        tools = by[2]["result"]["tools"]
+        self.assertTrue(all(t["annotations"]["readOnlyHint"] for t in tools))
+        self.assertFalse(any(w in t["name"] for t in tools for w in ("approve", "reject", "write", "delete", "update")))
+        for res in by[3]["result"]["structuredContent"]["results"]:
+            self.assertEqual(res["review"]["status"], "approved")
+        self.assertIn("error", by[4])
+        self.assertNotIn("farm_survey", json.dumps(r))
+
+    def test_signature_detects_tampering(self):
+        try:
+            import cryptography  # noqa: F401
+        except ImportError:
+            self.skipTest("cryptography not installed")
+        import base64, signing
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        key = Ed25519PrivateKey.generate()
+        man = {"format": signing.FORMAT, "files": [{"path": "x", "sha256": "a" * 64}]}
+        sig = key.sign(signing.canonical(man))
+        key.public_key().verify(sig, signing.canonical(man))
+        man["files"][0]["sha256"] = "b" * 64
+        with self.assertRaises(Exception):
+            key.public_key().verify(sig, signing.canonical(man))

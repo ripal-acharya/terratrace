@@ -252,6 +252,24 @@ def known_review_keys():
     return keys
 
 
+def release_status():
+    """Verify the signed release (signing.py) for the UI. Never raises."""
+    try:
+        import signing
+        r = signing.verify()
+    except BaseException as e:
+        return {"ok": False, "error": f"Signing not available: {e}"}
+    mcp_calls = 0
+    try:
+        mcp_calls = sum(1 for _ in open(INSTANCE / "mcp_access_log.jsonl", encoding="utf-8"))
+    except OSError:
+        pass
+    return {"ok": r.get("ok"), "signature_valid": r.get("signature_valid"), "signed_at": r.get("signed_at"),
+            "approved_results": r.get("approved_results"), "key_fingerprint": r.get("key_fingerprint"),
+            "audit_continues": r.get("audit_continues"), "error": r.get("error"),
+            "files": r.get("files", []), "mcp_calls": mcp_calls}
+
+
 def current_reviews(roles):
     state = {}
     for e in audit_entries():
@@ -433,6 +451,8 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/health":
             return self._json(200, {"ok": True, "ai_configured": bool(API_KEY), "model": MODEL if API_KEY else None,
                                     "prepared": list(prepared_answers().keys())})
+        if path == "/api/release":
+            return self._json(200, release_status())
         if path == "/api/users":
             if not can(roles, "admin"):
                 return self._json(403, {"error": "Admins only."})
@@ -456,6 +476,20 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(401, {"error": "Please sign in."})
         if path == "/api/review":
             return self.review(s)
+        if path == "/api/release/sign":
+            if not can(s["roles"], "review"):
+                return self._json(403, {"error": "Only reviewers can sign a release."})
+            try:
+                import signing
+                with _review_lock:
+                    rel = signing.sign()
+                    append_audit({"record_key": "release:signed", "field": "release_signature", "old_value": "",
+                                  "new_value": rel["key_fingerprint"], "rule_or_model": "Ed25519 signature over SHA-256 file hashes",
+                                  "evidence": f"{len(rel['manifest']['files'])} files, {len(rel['manifest']['approved_results'])} approved results",
+                                  "proposed_by": "TerraTrace", "approved_by": s["email"], "timestamp": now_iso()})
+            except BaseException as e:  # missing package raises SystemExit
+                return self._json(503, {"error": f"Could not sign: {e}"})
+            return self._json(200, release_status())
         if path == "/api/chat":
             return self.chat(s)
         return self._json(404, {"error": "Not found"})
