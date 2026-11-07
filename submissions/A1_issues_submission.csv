@@ -1,0 +1,5 @@
+table,record_key,issue_type,confidence,explanation
+shipments,ship:4500006790:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot from CN has only a truck leg; expected EF-TKM-SHIP-REEFER
+shipments,ship:4500006928:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot from GLO has only a truck leg; expected EF-TKM-SHIP-REEFER
+shipments,ship:4500006935:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot from GLO has only a truck leg; expected EF-TKM-SHIP-REEFER
+shipments,ship:4500007014:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot from FO has only a truck-reefer leg; expected EF-TKM-SHIP-REEFER
