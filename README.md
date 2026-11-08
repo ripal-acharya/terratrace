@@ -36,6 +36,21 @@ python3 manage_users.py demo   # prints 4 demo logins (viewer, reviewer, advisor
 python3 server.py              # open http://127.0.0.1:8000 and sign in with one of them
 ```
 
+`manage_users.py demo` makes a new random password for each demo user on **your** computer and
+prints it once, for example:
+
+```
+Demo users (save these passwords now; they are not stored in plain text):
+  viewer@terratrace.demo       viewer        <random password>
+  reviewer@terratrace.demo     reviewer      <random password>
+  advisor@terratrace.demo      farm_advisor  <random password>
+  admin@terratrace.demo        admin         <random password>
+```
+
+Copy an email and its password into the login page. There are no fixed passwords in the code on purpose:
+a password written in a public repository would let anyone sign in. Lost the passwords? Run
+`python3 manage_users.py reset reviewer@terratrace.demo` for a new one.
+
 Sign in as `reviewer@terratrace.demo` to approve results and sign them; switch the language with the
 flag button (EN / FI / SV). The suggested Copilot questions work offline; free-text AI questions
 need a Gemini key in `.env` (see `.env.example`).
