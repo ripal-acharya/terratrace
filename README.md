@@ -23,6 +23,23 @@ person approves it.
 | **Review & Audit Log** | traceability | Approve / reject every result and every data correction; append-only audit log; export of approved results only |
 | **Languages** | all | The whole app in English, Finnish (Suomi) or Swedish (Svenska); the choice is kept in the browser until it is changed (`app/i18n.js`, `app/i18n_data.js`) |
 
+## Try it in 2 minutes (for judges)
+
+The computed results are in the repository (`app/data/*.json`), so the app runs **without** the
+Apetit data package and without any API key:
+
+```bash
+git clone https://github.com/ripal-acharya/terratrace.git && cd terratrace
+python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python3 manage_users.py demo   # prints 4 demo logins (viewer, reviewer, advisor, admin) once
+python3 server.py              # open http://127.0.0.1:8000 and sign in with one of them
+```
+
+Sign in as `reviewer@terratrace.demo` to approve results and sign them; switch the language with the
+flag button (EN / FI / SV). The suggested Copilot questions work offline; free-text AI questions
+need a Gemini key in `.env` (see `.env.example`).
+
 ## Run it (3 commands)
 
 Requirements: Python 3.9+ with pandas and numpy. No Node.js, no build step, no internet needed
