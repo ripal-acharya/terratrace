@@ -1,0 +1,20 @@
+scope,category,tco2e,method_note
+scope1,fugitive_refrigerants,908.35,fuel MWh x fossil EF + refrigerant top-up x GWP100; cleaned per pipeline/inventory.py
+scope1,stationary_and_mobile_combustion,3505.59,fuel MWh x fossil EF + refrigerant top-up x GWP100; cleaned per pipeline/inventory.py
+scope2_location,purchased_electricity,962.56,MWh x grid / heat average; cleaned per pipeline/inventory.py
+scope2_market,purchased_electricity,60.9,uncovered MWh x residual mix (GoO from registry) / supplier heat EF; cleaned per pipeline/inventory.py
+scope3,cat01_purchased_goods_services,204083.21,reference calculator on cleaned data; cleaned per pipeline/inventory.py
+scope3,cat02_capital_goods,2866.61,reference calculator on cleaned data; cleaned per pipeline/inventory.py
+scope3,cat03_fuel_energy,1487.3,reference calculator on cleaned data; cleaned per pipeline/inventory.py
+scope3,cat04_upstream_transport,4720.06,reference calculator on cleaned data; cleaned per pipeline/inventory.py
+scope3,cat05_waste,2716.49,reference calculator on cleaned data; cleaned per pipeline/inventory.py
+scope3,cat06_business_travel,148.26,reference calculator on cleaned data; cleaned per pipeline/inventory.py
+scope3,cat07_employee_commuting,325.46,reference calculator on cleaned data; cleaned per pipeline/inventory.py
+scope3,cat09_downstream_transport,5018.48,reference calculator on cleaned data; cleaned per pipeline/inventory.py
+scope3,cat11_use_of_sold_products,1797.73,reference calculator on cleaned data; cleaned per pipeline/inventory.py
+scope3,cat12_end_of_life,1971.65,reference calculator on cleaned data; cleaned per pipeline/inventory.py
+total,scope1_total,4413.93,sum; cleaned per pipeline/inventory.py
+total,scope2_location_total,962.56,sum; cleaned per pipeline/inventory.py
+total,scope2_market_total,60.9,sum; cleaned per pipeline/inventory.py
+total,scope3_total,225135.25,sum; cleaned per pipeline/inventory.py
+memo,biogenic_co2_scope1,10916.02,"biogenic CO2, reported separately; cleaned per pipeline/inventory.py"

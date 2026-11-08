@@ -46,6 +46,16 @@ def load_inventory(year):
             [["scope", "category", "tco2e"]].to_dict("records")}
 
 
+def inventory_from_summary(summary, year):
+    """Our own inventory (pipeline/inventory.py, task A2) in the same shape as load_inventory."""
+    df = pd.DataFrame(summary)
+    get = lambda cat: float(df.loc[df.category == cat, "tco2e"].sum())
+    return {"year": year, "scope1": get("scope1_total"), "scope2_market": get("scope2_market_total"),
+            "scope2_location": get("scope2_location_total"), "scope3": get("scope3_total"),
+            "cat01": get("cat01_purchased_goods_services"), "source": "TerraTrace A2 inventory (pipeline/inventory.py)",
+            "lines": df[df.scope.isin(["scope1", "scope2_location", "scope2_market", "scope3"])][["scope", "category", "tco2e"]].to_dict("records")}
+
+
 def purchases_with_factors(year):
     """ERP purchase lines of one year x library factor (incl. flag_share). Credit notes net against receipts."""
     erp = pd.read_csv(C.D / "02_raw_feeds" / "erp_purchase_lines_2021_2025.csv", parse_dates=["posting_date"])
@@ -109,8 +119,8 @@ def base_year(inv):
                                 "Apetit's own restatements of 2022 and 2023 scope 3 (published_inventory_history.csv). "
                                 "The 2019 activity data are not in the package, so this stays a range."},
         "option_recent": {"year": inv["year"], "scope1": inv["scope1"], "scope2_market": inv["scope2_market"], "scope3": inv["scope3"],
-                          "note": f"Most recent complete inventory in the package ({inv['year']}, tasks/dev). SBTi V2 prefers the latest "
-                                  "year with comprehensive data; once the 2025 inventory (task A2) is done it replaces this."},
+                          "note": f"Latest complete inventory ({inv['year']}, source: {inv.get('source', '')}). SBTi V2 prefers the latest "
+                                  "year with comprehensive data. Add the Foodhills growers (in scope from 2026) to this base."},
         "foodhills": {**fh, "share_of_scope3": fh["tco2e"] / inv["scope3"], "threshold": 0.05,
                       "note": "Foodhills growers are in scope 3 FLAG from 2026. Add them to the base year. The acquisition "
                               "also adds Bjuv's own scope 1 and 2 (from December 2025), not estimated here."},
@@ -236,9 +246,13 @@ def screening(year=2025):
                          "Annex I: verify per product (structural_events.csv)."}
 
 
-def run():
-    inv = load_inventory(2024)
-    fl = flag_split(inv, 2024)
+def run(inventory=None):
+    if inventory:
+        inv = inventory_from_summary(inventory["summary"], inventory["year"])
+    else:
+        inv = load_inventory(2024)
+        inv["source"] = "tasks/dev/A2_dev_inventory_2024.csv"
+    fl = flag_split(inv, inv["year"])
     lv = levers_table()
     pw = pathway(inv, fl, lv)
     abate = [l for l in lv if l["kind"] == "abatement" and l["abatement_t"] > 0]
@@ -262,7 +276,7 @@ def run():
                        "Structural (L05, L26) and measurement (L27) levers are not counted as reductions.",
             "macc": "Cost per tonne = (capex x capital recovery factor at 6 % over the lever lifetime + yearly opex change) / design "
                     "abatement. Uncertainty band by confidence: high +/-25 %, medium +/-50 %, low +/-75 % (our assumption).",
-            "sources": ["tasks/dev/A2_dev_inventory_2024.csv", "data/05_scenarios/decarbonisation_levers.csv",
+            "sources": ["app/data/inventory.json (our 2025 inventory, task A2)", "tasks/dev/A2_dev_inventory_2024.csv", "data/05_scenarios/decarbonisation_levers.csv",
                         "data/05_scenarios/transition_scenarios.csv", "data/05_scenarios/structural_events.csv",
                         "data/05_scenarios/published_inventory_history.csv", "data/02_raw_feeds/erp_purchase_lines_2021_2025.csv",
                         "data/01_master/emission_factor_library.csv", "data/03_farming/foodhills_odlingsdata_se.csv",

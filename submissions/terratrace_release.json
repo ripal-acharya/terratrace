@@ -1,14 +1,19 @@
 {
   "manifest": {
     "format": "terratrace-signed-release/1",
-    "created_utc": "2026-11-07T20:38:38Z",
+    "created_utc": "2026-11-08T03:02:14Z",
     "signer": "TerraTrace release key (Team FarmSense)",
     "note": "Synthetic data from the Since AI / Apetit package.",
     "files": [
       {
         "path": "submissions/A1_issues_submission.csv",
-        "sha256": "79ee25c2bf89704b993fd1f5a436eb7e18cb7f3566a7dd1508ae8ee5d6df2aed",
-        "bytes": 580
+        "sha256": "c20841d86e7cedb17800bf71db87585b7fdb52a2120e45074a32c8f4148ae0c8",
+        "bytes": 10298
+      },
+      {
+        "path": "submissions/A2_inventory_2025_submission.csv",
+        "sha256": "e9e1eacd126a0a349779c620ff8fc5c7a94bd53d4e8dc98de94b73f0d0c78c9f",
+        "bytes": 2016
       },
       {
         "path": "submissions/C1_yields_2027_2031_submission.csv",
@@ -41,6 +46,11 @@
         "bytes": 17261
       },
       {
+        "path": "app/data/inventory.json",
+        "sha256": "fade11daa231c80e2d2789bc5c9c8067f95857584ef786daea6168e8b7cda9d5",
+        "bytes": 59069
+      },
+      {
         "path": "app/data/meta.json",
         "sha256": "3f48275fc0fe52c4618a3de86affd6dd738127bb198685af9f4e97a0c1a09593",
         "bytes": 163
@@ -49,6 +59,11 @@
         "path": "app/data/nature.json",
         "sha256": "240f8e445dec9655623b57d3d5e97de0fabfc9eb94ef93dc19a759337bc1d948",
         "bytes": 28499
+      },
+      {
+        "path": "app/data/pathways.json",
+        "sha256": "824d4c6e18775420e179b1865773e9889d8f50cfc894fb2a077f05a36003f96a",
+        "bytes": 43080
       },
       {
         "path": "app/data/transport.json",
@@ -60,41 +75,17 @@
       {
         "record_key": "action:A1",
         "approved_by": "reviewer@terratrace.demo",
-        "timestamp": "2026-11-07T16:38:11Z",
-        "audit_hash": "905702ff7c67ec2057990e7167e536fd08d224c542b67226dca10138085cea8d"
-      },
-      {
-        "record_key": "action:A2",
-        "approved_by": "reviewer@terratrace.demo",
-        "timestamp": "2026-11-07T20:38:04Z",
-        "audit_hash": "82429827ebbc864c5e661434fa53a97c0446af0a3839322c21661d00a36cb7ab"
-      },
-      {
-        "record_key": "action:A3",
-        "approved_by": "reviewer@terratrace.demo",
-        "timestamp": "2026-11-07T20:38:06Z",
-        "audit_hash": "addaaa4a735b6ee0bfe1d330c56883da2ae75bc50edcfc066e47aa3a520b1524"
-      },
-      {
-        "record_key": "corr:farm_survey:FS00236",
-        "approved_by": "reviewer@terratrace.demo",
-        "timestamp": "2026-11-07T20:37:03Z",
-        "audit_hash": "221c79fe04f11f37aa472a855a403a9ee99d47c564a3d565a7976454fd15ccec"
-      },
-      {
-        "record_key": "risk:FI_SW:pea:ssp126",
-        "approved_by": "reviewer@terratrace.demo",
-        "timestamp": "2026-11-07T16:31:58Z",
-        "audit_hash": "54edf9ba01fd4fba8ce9a88c489cd1f1c1f703ec2471004b84871eed8f5af1b4"
+        "timestamp": "2026-11-07T20:54:07Z",
+        "audit_hash": "5692502e1a26a92754342d00efe2bd378bd360c8abf400a07450c564486b255f"
       }
     ],
     "audit": {
-      "entries": 5,
-      "head_hash": "addaaa4a735b6ee0bfe1d330c56883da2ae75bc50edcfc066e47aa3a520b1524",
+      "entries": 1,
+      "head_hash": "5692502e1a26a92754342d00efe2bd378bd360c8abf400a07450c564486b255f",
       "chain_valid": true
     }
   },
-  "signature_ed25519": "DuxjPa90W8vlLekEtpgznVBnNxMznIpRKm9kowi0lHw0nwAhmUuDvmV7a22QSI0r0O9Y+x5v48NaP70kat7GCA==",
+  "signature_ed25519": "ymyJluHznGwcTtvqu4ap0s93Ipyqp0ctAHD/4ZgFaTvIXA58nhqUYp9xbAl7D2u/K/OLOl/o+XxtbdkUV6erAA==",
   "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAksErCi9Sm7CBYqr89FR2e26PlqMnaMtuqeHp1nieZQ8=\n-----END PUBLIC KEY-----\n",
   "key_fingerprint": "SHA256:39d9c52ae3d9fedf11c4e40e86a85ffa"
 }

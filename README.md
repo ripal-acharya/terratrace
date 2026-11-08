@@ -17,9 +17,11 @@ person approves it.
 | **Climate Risk** | C1, C2, C3 | Yield forecast 2027–2031, yield change and bad-year probability 2041–2060 under SSP1-2.6 / 2-4.5 / 5-8.5, € risk and value of irrigation, back-test |
 | **Nature Map** | D1 (SBTN) | Phosphorus and nitrogen from contract parcels to water in 2025, catchment priority map and ranking |
 | **Transport CO₂** | A (cat 4 and 9) | tCO₂e by mode and year, automatic detection and correction of missing sea legs |
+| **GHG inventory 2025** | A2, A1 | Scope 1, 2 and 3 for 2025 from the raw feeds: every data issue fixed and logged (107 in 11 tables), checked on the public 2023/2024 answers (score 91.4 / 90.1 vs package baseline 25.5 / 23.2) |
 | **Pathways & targets** | B1, B2, D2 | SBTi targets with a FLAG split, pathway under two NGFS scenarios with the gap per year, base-year options, abatement cost curve (MACC) of all 30 levers, value-chain nature screening of 2025 purchases |
-| **AI Copilot** | E | Questions in plain English; answers name their evidence (file and row) |
+| **AI Copilot** | E | Questions in English, Finnish or Swedish; answers come in the same language and name their evidence (file and row) |
 | **Review & Audit Log** | traceability | Approve / reject every result and every data correction; append-only audit log; export of approved results only |
+| **Languages** | all | The whole app in English, Finnish (Suomi) or Swedish (Svenska); the choice is kept in the browser until it is changed (`app/i18n.js`, `app/i18n_data.js`) |
 
 ## Run it (3 commands)
 
@@ -66,7 +68,8 @@ runs and the suggested questions are answered directly from the results.
 * `submissions/C1_yields_2027_2031_submission.csv`
 * `submissions/C2_climate_yield_risk_submission.csv`
 * `submissions/D1_catchment_priority_submission.csv`
-* `submissions/A1_issues_submission.csv` (shipment `missing_leg` issues only)
+* `submissions/A1_issues_submission.csv` (2025 issues from 11 tables; dev check: precision 96 %, recall 82 %, score 88.0)
+* `submissions/A2_inventory_2025_submission.csv` (2025 inventory, every template row)
 
 ## Evidence that it works
 
@@ -117,7 +120,7 @@ Measurement improvements are not reductions: lever L27 is shown as "not a reduct
 * **Copilot.** Login required; 1,000 characters; 10 questions per minute per user; 8 KB request limit; the API
   key stays in `.env` on the server; only a short summary of results is sent, never farm-level rows.
 * **CSV export** (reviewers and admins) contains approved results only and escapes spreadsheet formulas.
-* The server binds to `127.0.0.1` only. Tests: `python3 -m unittest discover -s tests -v` (27 tests).
+* The server binds to `127.0.0.1` only. Tests: `python3 -m unittest discover -s tests -v` (32 tests).
 
 ## Using real Apetit data (privacy by design)
 
@@ -155,13 +158,14 @@ same code runs, but these rules apply:
 * Synthetic data; one weather realisation per SSP; no CO₂ fertilisation and no new varieties.
 * Earlier sowing and tolerant varieties are not modelled; irrigation is.
 * The nature model is a simple export-coefficient model calibrated on six catchments.
-* Not covered yet: our own full 2025 GHG inventory (A2) and the E answers file. The pathway starts from the 2024 inventory in the package until A2 is done.
+* Not covered yet: the E answers file; A1 issue types area_mismatch, coordinate_swap, total_mismatch, mode_mislabel.
 
 ## Open-source components and licences
 
 | Component | Used for | Licence |
 |---|---|---|
 | Python standard library | web server, Copilot API, audit log | PSF License |
+| Since AI `ccn_tools` reference calculator (in the data package, not copied here) | A2 inventory calculation on our cleaned tables | MIT (© Since AI ry 2026) |
 | pandas | data pipeline | BSD 3-Clause |
 | NumPy | models and calculations | BSD 3-Clause |
 | cryptography | Ed25519 signatures (signing.py) | Apache 2.0 or BSD 3-Clause |
@@ -176,7 +180,7 @@ Apetit's own sample workbook is not used. TerraTrace code: MIT licence.
 ```
 run_all.py          one command: data -> results
 server.py           web server + Copilot API (standard library only)
-pipeline/           climate_risk.py, nature.py, transport.py, actions.py, pathways.py, audit.py, config.py
+pipeline/           climate_risk.py, nature.py, transport.py, actions.py, inventory.py, pathways.py, audit.py, config.py
 app/                index.html, app.js, styles.css, data/*.json
 submissions/        CSVs for the auto-scored tasks
 tests/              unit tests

@@ -254,3 +254,38 @@ class TestPathways(unittest.TestCase):
         self.assertTrue(all(r["priority"] in ("high", "medium", "low", "not screened") for r in rows))
         soy = [r for r in rows if r["material_id"] == "M130"]
         self.assertTrue(soy and soy[0]["priority"] == "high" and soy[0]["high_impact"])
+
+
+class TestInventory(unittest.TestCase):
+    """A2 2025 inventory and A1 issues (app/data/inventory.json, submissions/A2 and A1 CSVs)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.i = json.loads((ROOT / "app" / "data" / "inventory.json").read_text(encoding="utf-8"))
+
+    def test_rules_reproduce_the_public_answers(self):
+        for y in ("2023", "2024"):
+            self.assertGreater(self.i["dev_check"][y]["score"], 85, y)
+            self.assertGreater(self.i["dev_check"][y]["score"], self.i["naive_score"][y] + 50, y)
+
+    def test_totals_add_up(self):
+        s = {r["category"]: r["tco2e"] for r in self.i["summary"] if r["scope"] in ("scope3", "total")}
+        cats = sum(r["tco2e"] for r in self.i["summary"] if r["scope"] == "scope3")
+        self.assertAlmostEqual(cats, s["scope3_total"], places=3)
+
+    def test_a2_submission_has_every_template_row(self):
+        tpl = list(csv.DictReader(open(C.DATA_ROOT / "tasks" / "templates" / "A2_inventory_2025_submission.csv")))
+        sub = list(csv.DictReader(open(ROOT / "submissions" / "A2_inventory_2025_submission.csv")))
+        self.assertEqual([(r["scope"], r["category"]) for r in tpl], [(r["scope"], r["category"]) for r in sub])
+
+    def test_a1_uses_only_known_issue_types(self):
+        types = {"unit_error", "duplicate_record", "currency_error", "material_mismatch", "decimal_shift", "missing_record", "meter_spike",
+                 "wrong_gas_code", "certificate_mismatch", "soil_misreport", "outlier_implausible", "area_mismatch", "coordinate_swap",
+                 "pcf_unit_error", "pcf_stale_period", "total_mismatch", "missing_leg", "mode_mislabel"}
+        rows = list(csv.DictReader(open(ROOT / "submissions" / "A1_issues_submission.csv")))
+        self.assertTrue(rows)
+        self.assertTrue(all(r["issue_type"] in types for r in rows))
+        self.assertGreater(self.i["a1_dev"]["precision"], 0.9)
+
+    def test_every_correction_is_logged_with_a_rule(self):
+        self.assertTrue(all(c["rule"] and c["record_key"] for c in self.i["corrections_2025"]))

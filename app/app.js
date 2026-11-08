@@ -84,7 +84,94 @@ function icon(name) {
     (ICONS[name] || []).map((d) => s('path', { d })));
 }
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
-const num = (v, d = 0) => (isNum(v) ? v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '–');
+// ---------------------------------------------------------------- languages (English, Finnish, Swedish); choice is saved in this browser
+const LANGS = { en: { name: 'English', locale: 'en-US' }, fi: { name: 'Suomi', locale: 'fi-FI' }, sv: { name: 'Svenska', locale: 'sv-SE' } };
+const lang = () => { const l = pref('lang'); return LANGS[l] ? l : 'en'; };
+const I18N = window.TT_I18N || { D: {}, P: [], N: [], R: [] };
+const trDone = new Set();                   // texts we produced, so a second pass leaves them alone
+function trCore(t, k) {
+  const d = I18N.D[t];
+  if (d) return d[k];
+  for (const [re, fn] of I18N.R || []) {
+    const m = t.match(re);
+    if (m) return fn(m, k, (x) => trCore(x, k));
+  }
+  let out = t;
+  for (const n of I18N.N || []) if (out.includes(n[0])) out = out.split(n[0]).join(n[k + 1]);
+  if (out.length <= 170 || out === t) for (const p of I18N.P) if (out.includes(p[0])) out = out.split(p[0]).join(p[k + 1]);
+  return out;
+}
+function tr(text) {
+  const l = lang();
+  if (l === 'en' || !text) return text;
+  const t = text.trim();
+  if (!t || trDone.has(t)) return text;
+  const v = trCore(t, l === 'fi' ? 0 : 1);
+  if (v === t) return text;
+  trDone.add(v.trim());
+  return text.replace(t, v);
+}
+function translateTree(root) {
+  if (lang() === 'en' || !root) return;
+  const skip = (el) => el && el.closest && el.closest('code, textarea, .chat, [data-no-i18n]');
+  if (root.nodeType === 3) {
+    if (!skip(root.parentElement)) { const v = tr(root.nodeValue); if (v !== root.nodeValue) root.nodeValue = v; }
+    return;
+  }
+  if (root.nodeType !== 1 || skip(root)) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let n;
+  while ((n = w.nextNode())) nodes.push(n);
+  for (const x of nodes) { if (skip(x.parentElement)) continue; const v = tr(x.nodeValue); if (v !== x.nodeValue) x.nodeValue = v; }
+  for (const e of [root, ...root.querySelectorAll('[placeholder],[aria-label],[title]')]) {
+    for (const a of ['placeholder', 'aria-label', 'title']) {
+      const v = e.getAttribute(a);
+      if (v) { const t2 = tr(v); if (t2 !== v) e.setAttribute(a, t2); }
+    }
+  }
+}
+let i18nObs = null;
+function startI18n() {
+  document.documentElement.lang = lang();
+  if (!i18nObs) {
+    i18nObs = new MutationObserver((ms) => {
+      if (lang() === 'en') return;
+      for (const m of ms) {
+        if (m.type === 'characterData') translateTree(m.target);
+        else m.addedNodes.forEach((nd) => translateTree(nd));
+      }
+    });
+    i18nObs.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+  translateTree(document.body);
+}
+function setLang(l) {
+  pref('lang', LANGS[l] ? l : 'en');
+  S.ui.menu = null;
+  document.documentElement.lang = lang();
+  if (S.me) render(); else renderLogin();
+}
+const FLAG = {
+  en: () => s('svg', { viewBox: '0 0 60 30', class: 'flag', 'aria-hidden': 'true' }, s('rect', { width: 60, height: 30, fill: '#012169' }),
+    s('path', { d: 'M0,0 60,30 M60,0 0,30', stroke: '#fff', 'stroke-width': 6 }), s('path', { d: 'M0,0 60,30 M60,0 0,30', stroke: '#C8102E', 'stroke-width': 2 }),
+    s('path', { d: 'M30,0v30M0,15h60', stroke: '#fff', 'stroke-width': 10 }), s('path', { d: 'M30,0v30M0,15h60', stroke: '#C8102E', 'stroke-width': 6 })),
+  fi: () => s('svg', { viewBox: '0 0 18 11', class: 'flag', 'aria-hidden': 'true' }, s('rect', { width: 18, height: 11, fill: '#fff' }),
+    s('rect', { x: 5, width: 3, height: 11, fill: '#003580' }), s('rect', { y: 4, width: 18, height: 3, fill: '#003580' })),
+  sv: () => s('svg', { viewBox: '0 0 16 10', class: 'flag', 'aria-hidden': 'true' }, s('rect', { width: 16, height: 10, fill: '#006AA7' }),
+    s('rect', { x: 5, width: 2, height: 10, fill: '#FECC02' }), s('rect', { y: 4, width: 16, height: 2, fill: '#FECC02' })),
+};
+function langButton(extraClass) {
+  const l = lang();
+  return h('button', { class: 'iconbtn langbtn ' + (extraClass || ''), type: 'button', title: 'Language', 'aria-label': 'Language', 'aria-haspopup': 'true',
+    onclick: (e) => { e.stopPropagation(); S.ui.menu = S.ui.menu === 'lang' ? null : 'lang'; if (S.me) render(); else renderLogin(); } }, FLAG[l](), h('span', { class: 'lang-code', text: l.toUpperCase() }));
+}
+function langMenu() {
+  return h('div', { class: 'dropdown langmenu', role: 'menu', onclick: (e) => e.stopPropagation() },
+    Object.entries(LANGS).map(([k, v]) => h('button', { class: 'item' + (k === lang() ? ' on' : ''), type: 'button', role: 'menuitemradio', 'aria-checked': String(k === lang()), 'data-no-i18n': '',
+      onclick: () => setLang(k) }, FLAG[k](), h('span', { text: v.name }), k === lang() ? icon('ok') : null)));
+}
+const num = (v, d = 0) => (isNum(v) ? v.toLocaleString(LANGS[lang()].locale, { minimumFractionDigits: d, maximumFractionDigits: d }) : '–');
 const eur = (v) => (isNum(v) ? '€' + num(Math.round(v)) : '–');
 const pct = (v, d = 1) => (isNum(v) ? (v > 0 ? '+' : '') + num(v, d) + ' %' : '–');
 const has = (role) => !!(S.me && S.me.roles.includes(role));
@@ -202,7 +289,7 @@ function reject(it) {
 function localTime(ts) {
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return String(ts || '');
-  return d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString(LANGS[lang()].locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 function controls(it, wide) {
   const st = status(it.id);
@@ -712,6 +799,83 @@ function pageNature() {
   ];
 }
 
+// ---------------------------------------------------------------- GHG inventory 2025 (A2) + data-quality issues (A1)
+const CAT_NAME = {
+  fugitive_refrigerants: 'Refrigerants', stationary_and_mobile_combustion: 'Fuel combustion', purchased_electricity: 'Electricity',
+  purchased_heat_steam: 'Heat and steam', cat01_purchased_goods_services: 'Cat 1 Purchased goods and services', cat02_capital_goods: 'Cat 2 Capital goods',
+  cat03_fuel_energy: 'Cat 3 Fuel and energy', cat04_upstream_transport: 'Cat 4 Upstream transport', cat05_waste: 'Cat 5 Waste',
+  cat06_business_travel: 'Cat 6 Business travel', cat07_employee_commuting: 'Cat 7 Commuting', cat09_downstream_transport: 'Cat 9 Downstream transport',
+  cat11_use_of_sold_products: 'Cat 11 Use of sold products', cat12_end_of_life: 'Cat 12 End of life',
+};
+const SCOPE_NAME = { scope1: 'Scope 1', scope2_location: 'Scope 2 (location)', scope2_market: 'Scope 2 (market)', scope3: 'Scope 3' };
+function pageInventory() {
+  const I = S.data.inventory;
+  if (!I) return [pageHead('GHG inventory 2025', null), h('div', { class: 'empty', text: 'Run python3 run_all.py to create inventory.json.' })];
+  const st = S.ui.inventory = S.ui.inventory || { scope: 'scope3' };
+  const get = (cat) => (I.summary.find((r) => r.category === cat) || {}).tco2e;
+  const s1 = get('scope1_total'), s2m = get('scope2_market_total'), s2l = get('scope2_location_total'), s3 = get('scope3_total'), bio = get('biogenic_co2_scope1');
+  const total = s1 + s2m + s3;
+  const nIssues = I.issues_2025.reduce((a, r) => a + r.n, 0);
+  const dc = I.dev_check, m = I.method;
+  const src = { formula: m.steps, standard: m.standard, files: m.sources, assumptions: [m.check, m.boundary] };
+
+  // ---- overview
+  const kpi = (label, value, note) => h('div', { class: 'kp' }, h('span', { text: label }), h('strong', { text: value }), note ? h('small', { text: note }) : null);
+  const left = h('div', { class: 'ov-left' },
+    h('div', { class: 'ov-lbl', text: `Scope 1 + 2 (market) + 3 · ${I.year}` }),
+    h('div', { class: 'ov-hero' }, h('strong', { text: num(total) }), h('span', { text: 't CO₂e' })),
+    h('div', { class: 'kp-grid' },
+      kpi('Scope 1', num(s1) + ' t', 'fuels + refrigerants'),
+      kpi('Scope 2 market', num(s2m) + ' t', `location-based ${num(s2l)} t`),
+      kpi('Scope 3', num(s3) + ' t', `${num(get('cat01_purchased_goods_services') / s3 * 100)} % is category 1`),
+      kpi('Biogenic CO₂ (memo)', num(bio) + ' t', 'reported separately'),
+      kpi('Data issues fixed', String(nIssues), 'every fix is logged'),
+      kpi('Check on 2023 / 2024', `${num(dc['2023'].score, 0)} / ${num(dc['2024'].score, 0)}`, `package baseline ${num(I.naive_score['2023'], 0)} / ${num(I.naive_score['2024'], 0)}`)));
+
+  // ---- horizontal bars by category for the chosen scope
+  const rows = I.summary.filter((r) => r.scope === st.scope).sort((a, b) => b.tco2e - a.tco2e);
+  const mx = Math.max(...rows.map((r) => r.tco2e), 1);
+  const bars = h('div', { class: 'ibars' }, rows.map((r) => {
+    const it = item(`inv:${r.scope}:${r.category}`, `${SCOPE_NAME[r.scope]} · ${CAT_NAME[r.category] || r.category} ${I.year}`, `${num(r.tco2e, 1)} t CO₂e`, src);
+    const top = I.lines.filter((l) => l.scope === r.scope && (l.category === r.category)).slice(0, 3).map((l) => `${l.line_item}: ${num(l.tco2e)} t (${l.basis})`);
+    it.src = { ...src, assumptions: [...src.assumptions, ...top] };
+    return h('div', { class: 'ibar' },
+      h('div', { class: 'ib-t' }, h('span', { text: CAT_NAME[r.category] || r.category }), h('strong', { text: num(r.tco2e) + ' t' })),
+      h('div', { class: 'ib-track' }, h('div', { class: 'ib-fill', style: `width:${Math.max(0.6, (r.tco2e / mx) * 100).toFixed(1)}%` })),
+      h('div', { class: 'ib-r' }, controls(it)));
+  }));
+  const scopeTabs = h('div', { class: 'seg-ctl', role: 'radiogroup', 'aria-label': 'Scope' },
+    Object.entries(SCOPE_NAME).map(([k, t]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(k === st.scope), class: k === st.scope ? 'on' : null, text: t, onclick: () => { st.scope = k; render(); } })));
+  const overview = card(`GHG inventory ${I.year}`, 'Calculated from the raw feeds, cleaned and logged (task A2)', h('div', { class: 'card-b' },
+    h('div', { class: 'ov' }, left, h('div', { class: 'ov-chart' }, h('div', { class: 'ov-lbl', text: `${SCOPE_NAME[st.scope]} by category, t CO₂e · tap ⓘ for the source` }), bars))), scopeTabs);
+
+  // ---- check against the public 2023 / 2024 answers
+  const chk = (y) => dc[y].rows.filter((r) => r.scope !== 'memo');
+  const checkCard = card('Checked against the public answers', `Same rules on 2023 and 2024 (tasks/dev): score ${num(dc['2023'].score, 1)} / ${num(dc['2024'].score, 1)} of 100`, h('div', { class: 'card-b tight' },
+    table(['Line', '2024 truth t', '2024 ours t', 'Error'], [1, 2, 3], chk('2024').map((r) => h('tr', {},
+      h('td', { text: (r.scope === 'total' ? '' : (SCOPE_NAME[r.scope] || r.scope) + ' · ') + (CAT_NAME[r.category] || r.category.replace(/_/g, ' ')) }),
+      h('td', { class: 'num', text: num(r.truth) }), h('td', { class: 'num', text: num(r.ours) }),
+      h('td', { class: 'num' }, h('span', { class: 'delta ' + (Math.abs(r.error_pct) <= 1 ? 'good' : Math.abs(r.error_pct) <= 5 ? 'flat' : 'bad'), text: (r.error_pct > 0 ? '+' : '') + num(r.error_pct, 1) + ' %' }))))),
+    h('div', { class: 'card-b' }, h('p', { class: 'small muted', text: `Package baseline without cleaning: ${num(I.naive_score['2023'], 1)} and ${num(I.naive_score['2024'], 1)}. Scope 2 market in 2023 is the one line we miss: it depends on one missing meter month at Säkylä.` }))));
+
+  // ---- data issues found (A1) and the correction log
+  const a1 = I.a1_dev;
+  const issueCard = card(`Data issues found in ${I.year}`, `${nIssues} issues in ${new Set(I.issues_2025.map((r) => r.table)).size} tables · checked on 2023–2024: precision ${num(a1.precision * 100)} %, recall ${num(a1.recall * 100)} % (task A1)`, h('div', { class: 'card-b' },
+    h('div', { class: 'chips' }, I.issues_2025.slice().sort((a, b) => b.n - a.n).map((r) => h('span', { class: 'chip static' }, h('strong', { text: String(r.n) }), ` ${r.issue_type.replace(/_/g, ' ')} · ${r.table.replace(/_/g, ' ')}`))),
+    h('div', { style: 'height:12px' }),
+    can('see_details') ? table(['Record', 'Issue', 'Field', 'Old → new', 'Rule'], [],
+      I.corrections_2025.filter((c) => can('see_farm') || !String(c.record_key).startsWith('farm')).slice(0, 40).map((c) => h('tr', {},
+        h('td', {}, h('code', { text: c.record_key })), h('td', {}, h('span', { class: 'pill tag', text: c.issue_type.replace(/_/g, ' ') })), h('td', { text: c.field }),
+        h('td', { class: 'small', text: `${c.old_value} → ${c.new_value}` }), h('td', { class: 'small', text: c.rule }))))
+      : h('div', { class: 'empty', text: 'Record-level corrections are visible to reviewers, farm advisors and admins.' })));
+
+  return [
+    pageHead(`GHG inventory ${I.year}`, 'Scope 1, 2 and 3 calculated automatically from Apetit\'s raw data, with every correction logged and checked against the public 2023 and 2024 answers.'),
+    overview,
+    h('div', { class: 'grid g2' }, checkCard, issueCard),
+  ];
+}
+
 // ---------------------------------------------------------------- pathways (B1 targets + pathway, B2 MACC, D2 screening)
 const BUCKET = { s12: 'Scope 1+2', s3: 'Scope 3 non-FLAG', flag: 'FLAG (land)' };
 const BUCKET_KEY = { s12: 'c1', s3: 'c3', flag: 'c4' };
@@ -828,7 +992,7 @@ function pagePathways() {
       h('div', { class: 'bo' }, h('span', { class: 'bo-t', text: 'Option A · 2019 (programme base)' }), h('strong', { text: `${num(o19.scope3_recalculated_low)}–${num(o19.scope3_recalculated_high)} t` }),
         h('small', { text: `Scope 3 after removing grain trade (${num(o19.grain_trade_share_low * 100, 1)}–${num(o19.grain_trade_share_high * 100, 1)} %, from Apetit's own restatements). Published: ${num(o19.published_scope3)} t.` })),
       h('div', { class: 'bo on' }, h('span', { class: 'bo-t', text: `Option B · ${inv.year} (recommended)` }), h('strong', { text: `${num(by.option_recent.scope3)} t` }),
-        h('small', { text: 'Latest complete inventory; SBTi V2 prefers the latest year. Replace with 2025 once task A2 is done.' }))),
+        h('small', { text: `Our own ${inv.year} inventory (task A2). SBTi V2 prefers the latest complete year. Add the Foodhills growers, in scope from 2026.` }))),
     h('div', { class: 'fh' }, h('span', { class: 'delta flat', text: `Foodhills growers: +${num(fh.tco2e)} t (${num(fh.share_of_scope3 * 100, 1)} % of scope 3)` }),
       h('span', { class: 'small muted', text: `${num(fh.delivered_t)} t peas (${fh.year}) × ${fh.factor_kg_per_kg} kg CO₂e/kg. Below the 5 % trigger on its own, but add it together with Bjuv's own scope 1+2.` })),
     h('ul', { class: 'events' }, by.events.map((e) => h('li', {}, h('span', { class: 'small muted', text: e.date }), ' ', e.event, h('span', { class: 'small muted', text: ' · ' + e.relevance })))),
@@ -852,7 +1016,7 @@ function pagePathways() {
 
   return [
     pageHead('Pathways & targets', 'SBTi targets with a FLAG split, a pathway under two NGFS scenarios, the abatement cost curve and a value-chain nature screening (tasks B1, B2, D2).'),
-    h('div', { class: 'banner-note' }, icon('info'), h('span', { text: `Starts from the ${inv.year} inventory in the package (tasks/dev), because our own 2025 inventory (task A2) is not built yet. Lever values are the package's design estimates.` })),
+    h('div', { class: 'banner-note' }, icon('info'), h('span', { text: `Starts from our own ${inv.year} inventory (task A2, see GHG inventory). Volumes are held at the base-year level. Lever values are the package's design estimates.` })),
     overview,
     macc,
     h('div', { class: 'grid g2' }, targets, baseCard),
@@ -1039,7 +1203,8 @@ function pageTransport() {
 function pageCopilot() {
   const st = S.ui.copilot;
   const prepared = (S.health && S.health.prepared) || [];
-  const out = h('div', { class: 'chat', 'aria-live': 'polite', id: 'chat-out' }, st.answer || 'Ask a question about the results. Answers name their evidence (file and row).');
+  if (st.answer && st.answerLang && st.answerLang !== lang()) { st.answer = ''; st.info = ''; }   // a new language starts a fresh answer
+  const out = h('div', { class: 'chat', 'aria-live': 'polite', id: 'chat-out' }, st.answer || tr('Ask a question about the results. Answers name their evidence (file and row).'));
   const info = h('p', { class: 'small muted', id: 'chat-info', text: st.info || '' });
   const ta = h('textarea', { maxlength: MAX_Q, placeholder: 'For example: Compare pea risk in Finland and Sweden under SSP5-8.5.', 'aria-label': 'Question' });
   ta.value = st.q || '';
@@ -1051,12 +1216,12 @@ function pageCopilot() {
     if (!q) { info.textContent = 'Please type a question.'; return; }
     if (q.length > MAX_Q) { info.textContent = `Please keep your question under ${MAX_Q} characters.`; return; }
     if (st.busy) return;
-    st.q = q; st.busy = true; st.answer = ''; st.info = 'Waiting for the answer…';
+    st.q = q; st.busy = true; st.answer = ''; st.answerLang = lang(); st.info = 'Waiting for the answer…';
     render();
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 100000);
     try {
-      const res = await api('/api/chat', { method: 'POST', body: { question: q }, raw: true, signal: ctl.signal });
+      const res = await api('/api/chat', { method: 'POST', body: { question: q, lang: lang() }, raw: true, signal: ctl.signal });
       if (res.status === 401) { S.me = null; renderLogin('Your session has ended. Please sign in again.'); return; }
       if (!res.ok) {
         let msg = 'The AI is not available right now. Please try again.';
@@ -1223,6 +1388,7 @@ const PAGES = [
   { group: 'Analysis', key: 'climate', label: 'Climate Risk', icon: 'cloud', fn: pageClimate },
   { group: 'Analysis', key: 'nature', label: 'Nature Map', icon: 'map', fn: pageNature },
   { group: 'Analysis', key: 'transport', label: 'Transport CO₂', icon: 'truck', fn: pageTransport },
+  { group: 'Analysis', key: 'inventory', label: 'GHG inventory 2025', icon: 'co2', fn: pageInventory },
   { group: 'Analysis', key: 'pathways', label: 'Pathways & targets', icon: 'trend', fn: pagePathways },
   { group: 'Assistant', key: 'copilot', label: 'AI Copilot', icon: 'bot', fn: pageCopilot },
   { group: 'Governance', key: 'review', label: 'Review & Audit Log', icon: 'check', fn: pageReview, need: 'see_corrections', badge: true },
@@ -1248,14 +1414,16 @@ function topbar(page) {
   const themeDark = pref('theme') === 'dark';
   const bar = h('header', { class: 'topbar' },
     h('button', { class: 'iconbtn menu-btn', type: 'button', 'aria-label': 'Open menu', onclick: () => { document.querySelector('.shell').classList.toggle('mobile-open'); } }, icon('menu')),
-    h('div', { class: 'titles' }, h('div', { class: 't1', text: page.label }), h('div', { class: 'crumbs', text: `TerraTrace › ${page.group || 'Account'} › ${page.label}` })),
+    h('div', { class: 'titles' }, h('div', { class: 't1', text: page.label }), h('div', { class: 'crumbs', text: `TerraTrace › ${tr(page.group || 'Account')} › ${tr(page.label)}` })),
     h('span', { class: 'spacer' }),
+    langButton(),
     h('button', { class: 'iconbtn', type: 'button', title: themeDark ? 'Light mode' : 'Dark mode', 'aria-label': 'Toggle dark mode',
       onclick: () => { pref('theme', themeDark ? 'light' : 'dark'); applyTheme(); render(); } }, icon(themeDark ? 'sun' : 'moon')),
     h('button', { class: 'iconbtn', type: 'button', title: 'Latest activity', 'aria-label': 'Notifications',
       onclick: (e) => { e.stopPropagation(); S.ui.menu = S.ui.menu === 'bell' ? null : 'bell'; render(); } }, icon('bell'), latest.length ? h('span', { class: 'dot' }) : null),
     h('button', { class: 'userbtn', type: 'button', 'aria-label': 'Account menu', onclick: (e) => { e.stopPropagation(); S.ui.menu = S.ui.menu === 'user' ? null : 'user'; render(); } },
       h('div', { class: 'avatar', text: initials(me.email) }), h('div', { class: 'who' }, h('div', { class: 'strong', text: me.email.split('@')[0] }), h('small', { text: me.roles.join(', ') }))));
+  if (S.ui.menu === 'lang') bar.append(langMenu());
   if (S.ui.menu === 'bell') {
     bar.append(h('div', { class: 'dropdown', onclick: (e) => e.stopPropagation() }, h('div', { class: 'dd-head strong', text: 'Latest activity' }),
       latest.length ? latest.map((e) => h('div', { class: 'notif' }, `${e.approved_by} ${e.new_value} `, h('code', { text: e.record_key }), h('small', { text: e.timestamp })))
@@ -1345,7 +1513,7 @@ function renderLogin(msg) {
         feat('drop', 'Nature priorities', 'Phosphorus and nitrogen hot spots by catchment (SBTN)'),
         feat('truck', 'Transport CO₂', 'Scope 3 categories 4 and 9, with missing legs found and fixed'),
         feat('check', 'Expert review', 'Nothing is final until a named expert approves it'))),
-    h('section', { class: 'login-side' }, h('div', { class: 'login-card' },
+    h('section', { class: 'login-side' }, h('div', { class: 'login-lang' }, langButton('on-login'), S.ui.menu === 'lang' ? langMenu() : null), h('div', { class: 'login-card' },
       h('div', { class: 'brandmark only-mobile' }, h('img', { class: 'logo', src: 'logo.svg', alt: 'TerraTrace logo' }), h('div', {}, h('div', { class: 'strong', text: 'TerraTrace' }), h('div', { class: 'small muted', text: 'Climate & Nature Navigator' }))),
       h('h1', { text: 'Welcome back' }), h('p', { text: 'Sign in to continue. Access is by invitation only.' }), form,
       h('div', { class: 'login-foot' }, icon('lock'), ' Secure session · synthetic data · no public sign-up')))));
@@ -1369,7 +1537,7 @@ async function boot() {
   if (!S.me) return renderLogin();
   document.getElementById('root').replaceChildren(h('p', { class: 'empty', text: 'Loading results…' }));
   try {
-    const names = ['climate', 'nature', 'transport', 'actions', 'pathways', 'corrections', 'meta'];
+    const names = ['climate', 'nature', 'transport', 'actions', 'pathways', 'inventory', 'corrections', 'meta'];
     const vals = await Promise.all(names.map((n) => api('/api/data/' + n)));
     names.forEach((n, i) => { S.data[n] = vals[i]; });
     S.health = await api('/api/health');
@@ -1385,9 +1553,10 @@ async function boot() {
 }
 
 window.addEventListener('hashchange', () => { closeMenus(); if (S.me) render(); });
-document.addEventListener('click', () => { if (S.ui.menu) { S.ui.menu = null; if (S.me) render(); } });
+document.addEventListener('click', () => { if (S.ui.menu) { S.ui.menu = null; if (S.me) render(); else renderLogin(); } });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.ui.menu) { S.ui.menu = null; render(); } });
 window.addEventListener('error', (e) => console.error('TerraTrace error:', e.message));
 S.ui = { climate: { combo: 'FI_SW|pea', scen: 'ssp245' }, nature: { id: null, region: null }, copilot: { q: '', answer: '', info: '', busy: false }, menu: null };
 applyTheme();
+startI18n();
 boot();

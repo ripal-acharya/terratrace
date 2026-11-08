@@ -51,7 +51,7 @@ MAX_ANSWER_TOKENS = 800
 PBKDF2_ITER = 240_000
 
 ROLES = ("viewer", "reviewer", "farm_advisor", "admin")
-DATA_FILES = ("climate", "nature", "transport", "actions", "pathways", "corrections", "meta")
+DATA_FILES = ("climate", "nature", "transport", "actions", "pathways", "inventory", "corrections", "meta")
 FARM_PREFIXES = ("farm_survey:", "farm:", "corr:")   # corr:<i>:farm_... handled in is_farm_key
 
 
@@ -192,6 +192,12 @@ def data_for(name, roles):
             d["entries"] = [e for e in d["entries"] if not is_farm_key(e.get("record_key"))]
     if name == "transport" and not can(roles, "see_details"):
         d["missing_legs"] = []      # viewers get totals only
+    if name == "inventory":
+        d["lines"] = [l for l in d.get("lines", []) if not str(l.get("line_item", "")).startswith(("F0", "farm"))]
+        if not can(roles, "see_details"):
+            d["corrections_2025"] = []   # viewers get totals and counts only
+        elif not can(roles, "see_farm"):
+            d["corrections_2025"] = [e for e in d.get("corrections_2025", []) if not is_farm_key(e.get("record_key"))]
     return d
 
 
@@ -258,6 +264,9 @@ def known_review_keys():
         keys.add(f"screen:{r.get('material_id')}:{r.get('origin')}")
     if pw.get("base_year"):
         keys.add("baseyear:choice")
+    iv = read_json("inventory.json") or {}
+    for r in iv.get("summary", []):
+        keys.add(f"inv:{r.get('scope')}:{r.get('category')}")
     return keys
 
 
@@ -315,6 +324,13 @@ def build_context():
     for a in ac["actions"]:
         lines.append(f"- {a['id']} {a['action']} | owner {a['owner']} | {a['evidence']}")
     lines.append("Note: " + ac["not_a_reduction"]["note"])
+    iv = read_json("inventory.json")
+    if iv:
+        lines.append(f"GHG inventory {iv['year']} (task A2, cleaned raw data + reference calculator) [source: app/data/inventory.json -> summary]: "
+                     + "; ".join(f"{r['scope']} {r['category']} {round(r['tco2e'], 1)} t" for r in iv["summary"]))
+        lines.append(f"Check on public answers: 2023 score {iv['dev_check']['2023']['score']}, 2024 score {iv['dev_check']['2024']['score']} "
+                     f"(package baseline {iv['naive_score']['2023']} / {iv['naive_score']['2024']}). "
+                     f"Data issues fixed in {iv['year']}: " + ", ".join(f"{r['n']} {r['issue_type']} in {r['table']}" for r in iv["issues_2025"]))
     pw = read_json("pathways.json")
     if pw:
         p = pw["pathway"]
@@ -602,15 +618,18 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(400, {"error": "Please type a question."})
         if len(q) > MAX_QUESTION_CHARS:
             return self._json(400, {"error": f"Please keep your question under {MAX_QUESTION_CHARS} characters."})
+        lang = body.get("lang") if body.get("lang") in ("fi", "sv") else "en"
         prep = prepared_answers().get(q)
-        if prep:
+        if prep and (lang == "en" or not API_KEY):
             return self._stream_text(prep, source="prepared")
         if not API_KEY:
             return self._json(503, {"error": "AI not available right now (no API key on the server). Try a suggested question."})
         ctx = build_context()
         if not ctx:
             return self._json(503, {"error": "Results are missing. Run: python3 run_all.py"})
-        messages = [{"role": "system", "content": SYSTEM + "\n\n" + ctx + "\n\nFRAMEWORK DIGEST:\n" + framework_digest()},
+        lang_rule = {"fi": "\nAnswer in Finnish. Keep file names, record keys and the word 'Evidence:' as they are.",
+                     "sv": "\nAnswer in Swedish. Keep file names, record keys and the word 'Evidence:' as they are."}.get(lang, "")
+        messages = [{"role": "system", "content": SYSTEM + lang_rule + "\n\n" + ctx + "\n\nFRAMEWORK DIGEST:\n" + framework_digest()},
                     {"role": "user", "content": q}]
         self._stream_ai(messages)
 

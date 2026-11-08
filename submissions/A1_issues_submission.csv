@@ -1,5 +1,108 @@
 table,record_key,issue_type,confidence,explanation
-shipments,ship:4500006790:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot from CN has only a truck leg; expected EF-TKM-SHIP-REEFER
-shipments,ship:4500006928:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot from GLO has only a truck leg; expected EF-TKM-SHIP-REEFER
-shipments,ship:4500006935:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot from GLO has only a truck leg; expected EF-TKM-SHIP-REEFER
-shipments,ship:4500007014:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot from FO has only a truck-reefer leg; expected EF-TKM-SHIP-REEFER
+energy_meter_readings,energy:S-HQ:2025-01:electricity,unit_error,0.9,value > 200 x site-year median: kWh keyed as MWh
+energy_meter_readings,energy:S-KAN:2025-06:electricity,unit_error,0.9,value > 200 x site-year median: kWh keyed as MWh
+energy_meter_readings,energy:S-SAK:2025-06:electricity,unit_error,0.9,value > 200 x site-year median: kWh keyed as MWh
+energy_meter_readings,energy:S-KAN:2025-04:oilseed_sidestream,meter_spike,0.9,> 2.4 x median: replaced with the same month of other years
+energy_meter_readings,energy:S-KAN:2025-06:oilseed_sidestream,missing_record,0.9,missing month filled from the same month of other years
+energy_meter_readings,energy:S-KAN:2025-12:wood_chips,meter_spike,0.9,> 2.4 x median: replaced with the same month of other years
+energy_meter_readings,energy:S-KAN:2025-07:wood_chips,missing_record,0.9,missing month filled from the same month of other years
+energy_meter_readings,energy:S-SAK:2025-10:biogas,missing_record,0.9,missing month filled from the same month of other years
+fuel_deliveries,fuel:FD00014,unit_error,0.9,< 1 % of usual delivery: x1000
+fuel_deliveries,fuel:FD00044,unit_error,0.9,< 1 % of usual delivery: x1000
+waste_transfer_notes,waste:WT000933,unit_error,0.9,< 1 % of stream median: x1000
+waste_transfer_notes,waste:WT000964,unit_error,0.9,< 1 % of stream median: x1000
+waste_transfer_notes,waste:WT000966,unit_error,0.9,< 1 % of stream median: x1000
+travel_bookings,travel:BK100835,duplicate_record,0.9,"same traveller, date, route, distance, nights"
+travel_bookings,travel:BK101486,duplicate_record,0.9,"same traveller, date, route, distance, nights"
+travel_bookings,travel:BK102762,duplicate_record,0.9,"same traveller, date, route, distance, nights"
+travel_bookings,travel:BK100569,duplicate_record,0.9,"same traveller, date, route, distance, nights"
+travel_bookings,travel:BK101255,duplicate_record,0.9,"same traveller, date, route, distance, nights"
+travel_bookings,travel:BK101130,duplicate_record,0.9,"same traveller, date, route, distance, nights"
+erp_purchase_lines,erp:5100000555:10,duplicate_record,0.9,"same supplier, material, qty, amount within 10 days"
+erp_purchase_lines,erp:5100000551:10,duplicate_record,0.9,"same supplier, material, qty, amount within 10 days"
+erp_purchase_lines,erp:5100000559:10,duplicate_record,0.9,"same supplier, material, qty, amount within 10 days"
+erp_purchase_lines,erp:5100000554:10,duplicate_record,0.9,"same supplier, material, qty, amount within 10 days"
+erp_purchase_lines,erp:5100000552:10,duplicate_record,0.9,"same supplier, material, qty, amount within 10 days"
+erp_purchase_lines,erp:5100000560:10,duplicate_record,0.9,"same supplier, material, qty, amount within 10 days"
+erp_purchase_lines,erp:5100000556:10,duplicate_record,0.9,"same supplier, material, qty, amount within 10 days"
+erp_purchase_lines,erp:5100000557:10,duplicate_record,0.9,"same supplier, material, qty, amount within 10 days"
+erp_purchase_lines,erp:5100000558:10,duplicate_record,0.9,"same supplier, material, qty, amount within 10 days"
+erp_purchase_lines,erp:5100000553:10,duplicate_record,0.9,"same supplier, material, qty, amount within 10 days"
+erp_purchase_lines,erp:4500006871:10,material_mismatch,0.9,supplier almost never delivers this material
+erp_purchase_lines,erp:4500007065:10,material_mismatch,0.9,supplier almost never delivers this material
+erp_purchase_lines,erp:4500006858:10,material_mismatch,0.9,supplier almost never delivers this material
+erp_purchase_lines,erp:4500006803:10,material_mismatch,0.9,supplier almost never delivers this material
+erp_purchase_lines,erp:4500007115:10,material_mismatch,0.9,supplier almost never delivers this material
+erp_purchase_lines,erp:4500006579:10,material_mismatch,0.9,supplier almost never delivers this material
+erp_purchase_lines,erp:4500006594:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006645:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006644:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006704:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006243:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006974:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006246:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006677:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006028:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500005837:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500005860:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006495:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006614:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006663:10,unit_error,0.9,unit price ~1000 x median: tonnes keyed as KG
+erp_purchase_lines,erp:4500006748:10,decimal_shift,0.9,unit price ~10 x off: decimal shift
+erp_purchase_lines,erp:4500006116:10,decimal_shift,0.9,unit price ~10 x off: decimal shift
+erp_purchase_lines,erp:4500006126:10,decimal_shift,0.9,unit price ~10 x off: decimal shift
+erp_purchase_lines,erp:4500006016:10,decimal_shift,0.9,unit price ~10 x off: decimal shift
+erp_purchase_lines,erp:4500006547:10,decimal_shift,0.9,unit price ~10 x off: decimal shift
+erp_purchase_lines,erp:4500007105:10,decimal_shift,0.9,unit price ~10 x off: decimal shift
+erp_purchase_lines,erp:4500007109:10,currency_error,0.9,supplier bills in another currency
+erp_purchase_lines,erp:4500007111:10,currency_error,0.9,supplier bills in another currency
+erp_purchase_lines,erp:4500007240:10,currency_error,0.9,spend ~11 x usual: SEK amount booked as EUR
+erp_purchase_lines,erp:4500007277:10,currency_error,0.9,spend ~11 x usual: SEK amount booked as EUR
+erp_purchase_lines,erp:4500007256:10,currency_error,0.9,spend ~11 x usual: SEK amount booked as EUR
+refrigerant_service_log,refrigerant:RS00078,wrong_gas_code,0.9,system runs another refrigerant
+refrigerant_service_log,refrigerant:RS00080,unit_error,0.9,grams keyed as kg
+goo_cancellations,goo:S-PUD:2025,certificate_mismatch,0.9,internal log differs from the registry
+goo_cancellations,goo:S-BJU:2025,certificate_mismatch,0.9,internal log differs from the registry
+commuting_survey,commute:CS0003,unit_error,0.9,metres keyed as km
+commuting_survey,commute:CS0007,unit_error,0.9,metres keyed as km
+commuting_survey,commute:CS0063,unit_error,0.9,metres keyed as km
+commuting_survey,commute:CS0078,unit_error,0.9,metres keyed as km
+commuting_survey,commute:CS0086,unit_error,0.9,metres keyed as km
+supplier_pcfs,pcf:SUP011:M104:2025,pcf_unit_error,0.9,PCF not valid for this year / unit
+supplier_pcfs,pcf:SUP022:M107:2025,pcf_stale_period,0.9,PCF not valid for this year / unit
+supplier_pcfs,pcf:SUP023:M107:2025,pcf_stale_period,0.9,PCF not valid for this year / unit
+supplier_pcfs,pcf:SUP027:M121:2025,pcf_unit_error,0.9,PCF not valid for this year / unit
+supplier_pcfs,pcf:SUP040:M127:2025,pcf_stale_period,0.9,PCF not valid for this year / unit
+supplier_pcfs,pcf:SUP064:M142:2025,pcf_stale_period,0.9,PCF not valid for this year / unit
+supplier_pcfs,pcf:SUP072:M153:2025,pcf_unit_error,0.9,PCF not valid for this year / unit
+supplier_pcfs,pcf:SUP073:M154:2025,pcf_stale_period,0.9,PCF not valid for this year / unit
+farm_survey,farm_survey:FS00052,decimal_shift,0.9,N rate ~10 x off the crop median
+farm_survey,farm_survey:FS00325,decimal_shift,0.9,N rate ~10 x off the crop median
+farm_survey,farm_survey:FS01570,decimal_shift,0.9,N rate ~10 x off the crop median
+farm_survey,farm_survey:FS03212,decimal_shift,0.9,N rate ~10 x off the crop median
+farm_survey,farm_survey:FS03386,decimal_shift,0.9,N rate ~10 x off the crop median
+farm_survey,farm_survey:FS00932,outlier_implausible,0.9,yield > 3 x crop median
+farm_survey,farm_survey:FS01912,outlier_implausible,0.9,yield > 3 x crop median
+farm_survey,farm_survey:FS02059,outlier_implausible,0.9,yield > 3 x crop median
+farm_survey,farm_survey:FS02104,outlier_implausible,0.9,yield > 3 x crop median
+farm_survey,farm_survey:FS00156,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS00235,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS00507,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS00575,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS00625,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS01343,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS01444,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS01718,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS01783,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS01805,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS01991,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS02092,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS02140,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS02200,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS02840,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS03201,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+farm_survey,farm_survey:FS03332,soil_misreport,0.9,>= 30 % of the crop area on organic soil
+shipments,ship:4500006790:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot with only a road leg
+shipments,ship:4500006928:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot with only a road leg
+shipments,ship:4500006935:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot with only a road leg
+shipments,ship:4500007014:EF-TKM-SHIP-REEFER,missing_leg,0.9,import lot with only a road leg

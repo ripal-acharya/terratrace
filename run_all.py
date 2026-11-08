@@ -10,7 +10,7 @@ import warnings
 from datetime import datetime, timezone
 
 warnings.filterwarnings("ignore")
-from pipeline import config as C, audit, climate_risk, nature, transport, actions, pathways  # noqa: E402
+from pipeline import config as C, audit, climate_risk, nature, transport, actions, pathways, inventory  # noqa: E402
 
 
 def clean(o):
@@ -44,12 +44,14 @@ def main():
     na = nature.run(); print("  nature done")
     tr = transport.run(); print("  transport done")
     ac = actions.run(cl, na, tr); print("  actions done")
-    pw = pathways.run(); print("  pathways done")
+    iv = inventory.run(); print("  inventory 2025 done (A2 + A1)")
+    pw = pathways.run(iv); print("  pathways done")
     write("climate.json", cl)
     write("nature.json", na)
     write("transport.json", tr)
     write("actions.json", ac)
     write("pathways.json", pw)
+    write("inventory.json", iv)
     write("corrections.json", {"fields": audit.FIELDS, "entries": audit.entries()})
     write("meta.json", {"generated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
                         "data_package": C.DATA_ROOT.name, "note": C.SYNTHETIC_NOTE})

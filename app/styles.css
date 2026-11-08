@@ -745,3 +745,28 @@ html[data-theme="dark"] .chart .cptxt.cp1{fill:#f5a04a}
 .fh .delta{align-self:flex-start}
 .events{margin:6px 0 0;padding-left:18px;font-size:13px;display:grid;gap:4px}
 @media (max-width:640px){.bopt{grid-template-columns:1fr}.gap-row{flex-direction:column;align-items:flex-start}}
+
+/* ---------- inventory page (A2) ---------- */
+.ibars{display:grid;gap:10px;margin-top:6px}
+.ibar{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"t r" "b r";gap:4px 12px;align-items:center}
+.ib-t{grid-area:t;display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.ib-t strong{font-variant-numeric:tabular-nums}
+.ib-track{grid-area:b;height:12px;border-radius:999px;background:var(--soft);border:1px solid var(--line);overflow:hidden}
+.ib-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#8cc63f,#3f8a24)}
+.ib-r{grid-area:r}
+.chip.static{cursor:default}
+.chip.static strong{color:var(--brand-ink)}
+
+/* ---------- language picker ---------- */
+.flag{width:20px;height:13px;border-radius:2px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.1)}
+.langbtn{width:auto;padding:0 10px;gap:7px;display:inline-flex;align-items:center}
+.lang-code{font-size:12px;font-weight:700;letter-spacing:.04em}
+.langmenu{min-width:200px;right:120px}
+.langmenu .item{gap:12px;font-size:14px}
+.langmenu .item.on{font-weight:700;background:var(--soft)}
+.langmenu .item svg:not(.flag){margin-left:auto;width:16px;height:16px;color:var(--brand)}
+.login-side{position:relative}
+.login-lang{position:absolute;top:18px;right:18px;z-index:6}
+.login-lang .langbtn{background:var(--card);border:1px solid var(--line);height:38px;border-radius:12px;box-shadow:var(--shadow)}
+.login-lang .dropdown{top:46px;right:0}
+@media (max-width:900px){.langmenu{right:10px}.langbtn .lang-code{display:none}}
